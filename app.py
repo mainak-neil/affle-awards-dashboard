@@ -875,36 +875,149 @@ with t_q:
 # ----------------------------------------------------------------------------
 # Clients explorer
 # ----------------------------------------------------------------------------
+CLIENT_CSS = """
+<style>
+.lb {background:#fff; border:1px solid #E4E8EF; border-radius:14px; overflow:hidden;}
+.lb-head {display:flex; justify-content:space-between; align-items:baseline; padding:16px 18px 10px;}
+.lb-head b {font-family:'Sora','Segoe UI',sans-serif; font-size:15px; color:#0E1A3A;}
+.lb-head span {font-size:12px; color:#8A92A6;}
+.lb-scroll {max-height:470px; overflow:auto;}
+.lb table {width:100%; border-collapse:collapse; font-size:13px;}
+.lb th {position:sticky; top:0; background:#F7F8FB; color:#6A7389; font-weight:600; text-align:left;
+  padding:9px 10px; border-bottom:1px solid #E4E8EF; white-space:nowrap; z-index:1;}
+.lb td {padding:10px; border-bottom:1px solid #F0F2F6; vertical-align:middle; color:#1D2740;}
+.lb tr:last-child td {border-bottom:none;}
+.lb .num {text-align:right; font-variant-numeric:tabular-nums;}
+.lb .rk {width:30px; color:#9AA2B5; font-weight:600; text-align:center;}
+.lb .rk.top {color:#0E1A3A;}
+.lb .nm {font-weight:600; color:#0E1A3A;}
+.lb .wn {font-family:'Sora','Segoe UI',sans-serif; font-weight:700; color:#B8860B;}
+.chip {display:inline-flex; align-items:center; gap:5px; font-size:11.5px; color:#4A5470; background:#F3F5F9;
+  border-radius:999px; padding:2px 8px 2px 6px; margin:1px 4px 1px 0; white-space:nowrap;}
+.chip i {width:7px; height:7px; border-radius:50%; background:var(--c);}
+.bar {position:relative; height:6px; width:90px; background:#EEF1F5; border-radius:99px; display:inline-block; vertical-align:middle;}
+.bar b {position:absolute; left:0; top:0; bottom:0; border-radius:99px; background:#0ea99b;}
+.rate {font-size:12px; color:#4A5470; margin-left:8px; font-variant-numeric:tabular-nums;}
+.lb td.rt {white-space:nowrap;}
+.muted {color:#B0B7C6;}
+.pf {background:#fff; border:1px solid #E4E8EF; border-radius:16px; overflow:hidden;}
+.pf-top {display:grid; grid-template-columns:minmax(0,1fr) auto; gap:20px; align-items:center;
+  padding:20px 22px; background:linear-gradient(135deg,#0E1A3A,#1C346A); color:#fff;}
+.pf-name {font-family:'Sora','Segoe UI',sans-serif; font-size:24px; font-weight:700; letter-spacing:-0.02em;}
+.pf-top .chip {background:rgba(255,255,255,.1); color:#DCE3F2;}
+.pf-stats {display:flex; gap:26px;}
+.pf-v {display:block; font-family:'Sora','Segoe UI',sans-serif; font-size:26px; font-weight:700; line-height:1.1; color:#fff;}
+.pf-l {display:block; font-size:12px; color:#9FAAC4; margin-top:2px;}
+.pf-v.gold {color:#E8B44A;}
+.aw {display:grid; grid-template-columns:minmax(0,1fr) auto; gap:14px; align-items:center;
+  padding:14px 22px; border-top:1px solid #F0F2F6;}
+.aw-t {font-weight:600; color:#0E1A3A; font-size:14px; margin-bottom:4px;}
+.aw-m {font-size:12px; color:#6A7389;}
+.aw-r {text-align:right; white-space:nowrap;}
+.aw-v {font-family:'Sora','Segoe UI',sans-serif; font-size:18px; font-weight:700; color:#0E1A3A;}
+.aw-l {font-size:12px; color:#8A92A6;}
+.pill {display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:600; margin-right:6px;}
+@media (max-width:760px){ .pf-top{grid-template-columns:1fr;} .pf-stats{flex-wrap:wrap; gap:18px;} }
+</style>
+"""
+
+
+def bu_chips(bus) -> str:
+    return "".join(f'<span class="chip"><i style="--c:{COLORS.get(b, "#8A92A6")}"></i>{esc(b)}</span>' for b in bus)
+
+
 with t_client:
     recs = []
     for _, r in df.iterrows():
-        for name, n in parse_case_studies(r["Case Studies Submitted"]):
-            recs.append(dict(Client=name, BU=r["BU"], Award=r["Award"], Status=r["Status"], Submitted=n, Won=0))
-        for name, n in parse_case_studies(r["Case Studies Won"]):
-            recs.append(dict(Client=name, BU=r["BU"], Award=r["Award"], Status=r["Status"], Submitted=0, Won=n))
+        sub = parse_case_studies(r["Case Studies Submitted"])
+        wonl = parse_case_studies(r["Case Studies Won"])
+        for name, n in sub:
+            recs.append(dict(Client=name, BU=r["BU"], Award=r["Award"], Status=r["Status"], Quarter=r["Quarter"],
+                             Submitted=n, Won=0))
+        for name, n in wonl:
+            recs.append(dict(Client=name, BU=r["BU"], Award=r["Award"], Status=r["Status"], Quarter=r["Quarter"],
+                             Submitted=0, Won=n))
     if not recs:
         st.info("No clients listed yet. Fill the 'Case Studies Submitted / Won' columns in the sheet.")
     else:
         cs = pd.DataFrame(recs)
-        cl = cs.groupby("Client", as_index=False)[["Submitted", "Won"]].sum().sort_values(["Won", "Submitted"], ascending=False)
-        c1, c2 = st.columns([1, 1.25])
-        with c1:
-            cpick = st.selectbox("Choose a client / case study", cl["Client"], key="client_pick")
-            c = cs[cs["Client"] == cpick]
-            mini_cards([
-                ("Entries", cu(c["Submitted"].sum()), "case-study submissions", "#0ea99b"),
-                ("Wins", cu(c["Won"].sum()), "awards won", GOLD),
-                ("Awards", cu(c["Award"].nunique()), f"via {', '.join(sorted(c['BU'].unique()))}", "#3b8fd6"),
-            ])
-            ct = c.groupby(["Award", "BU", "Status"], as_index=False)[["Submitted", "Won"]].sum()
-            show_df(ct, hide_index=True, width="stretch")
-        with c2.container(border=True):
-            topc = cl.head(12).melt(id_vars="Client", var_name="Metric")
-            fig = px.bar(topc, y="Client", x="value", color="Metric", orientation="h", barmode="group",
-                         color_discrete_map={"Submitted": "#C9D2E0", "Won": GOLD}, title="Top clients by awards won")
-            fig.update_yaxes(categoryorder="array", categoryarray=cl.head(12)["Client"].tolist()[::-1], title=None)
-            fig.update_xaxes(title=None)
-            chart(fig, max(360, 34 * min(12, len(cl)) + 90))
+        # merge spelling variants: "Mother Dairy", "mother dairy ", "Mother  Dairy"
+        cs["Key"] = cs["Client"].str.lower().str.replace(r"\s+", " ", regex=True).str.strip()
+        display = cs.groupby("Key")["Client"].agg(lambda s: s.value_counts().index[0])
+        cs["Client"] = cs["Key"].map(display)
+        cs["Decided"] = cs["Submitted"].where(cs["Status"] == "Declared", 0)
+        cs["Awaiting"] = cs["Submitted"].where(cs["Status"] == "Pending", 0)
+
+        cl = cs.groupby("Client").agg(Entries=("Submitted", "sum"), Wins=("Won", "sum"), Decided=("Decided", "sum"),
+                                      Awaiting=("Awaiting", "sum"), Awards=("Award", "nunique"),
+                                      BUs=("BU", lambda s: sorted(set(s), key=str.lower))).reset_index()
+        cl["Entries"] = cl[["Entries", "Wins"]].max(axis=1)  # a win always implies an entry
+        cl["Decided"] = cl[["Decided", "Wins"]].max(axis=1)
+        cl["Rate"] = (cl["Wins"] / cl["Decided"]).where(cl["Decided"] > 0)
+        cl = cl.sort_values(["Wins", "Entries", "Client"], ascending=[False, False, True]).reset_index(drop=True)
+
+        mini_cards([
+            ("Clients", cu(len(cl)), "with at least one entry", "#0ea99b"),
+            ("Clients with a win", cu(int((cl["Wins"] > 0).sum())), f"{(cl['Wins'] > 0).mean():.0%} of clients", GOLD),
+            ("Client entries", cu(int(cl["Entries"].sum())), f"{int(cl['Awaiting'].sum())} awaiting results", "#3b8fd6"),
+            ("Top client", esc(cl.iloc[0]["Client"]) if cl.iloc[0]["Wins"] > 0 else "–",
+             f"{int(cl.iloc[0]['Wins'])} awards won" if cl.iloc[0]["Wins"] > 0 else "no wins yet", "#7c6ff0"),
+        ])
+
+        left, right = st.columns([1.15, 1])
+        with left:
+            rows = ""
+            for i, r in cl.iterrows():
+                rate = (f'<span class="bar"><b style="width:{r["Rate"] * 100:.0f}%"></b></span>'
+                        f'<span class="rate">{r["Rate"]:.0%}</span>') if pd.notna(r["Rate"]) else '<span class="muted">awaiting</span>'
+                rows += (f'<tr><td class="rk {"top" if i < 3 else ""}">{i + 1}</td>'
+                         f'<td><div class="nm">{esc(r["Client"])}</div>{bu_chips(r["BUs"])}</td>'
+                         f'<td class="num">{int(r["Entries"])}</td>'
+                         f'<td class="num">{f'<span class="wn">{int(r.Wins)}</span>' if r["Wins"] else '<span class="muted">0</span>'}</td>'
+                         f'<td class="rt">{rate}</td><td class="num">{int(r["Awards"])}</td></tr>')
+            html_block(CLIENT_CSS + f'''<div class="lb"><div class="lb-head"><b>Client leaderboard</b>
+                <span>ranked by awards won</span></div><div class="lb-scroll"><table><thead><tr>
+                <th></th><th>Client</th><th class="num">Entries</th><th class="num">Wins</th><th>Win rate</th>
+                <th class="num">Awards</th></tr></thead><tbody>{rows}</tbody></table></div></div>''')
+        with right.container(border=True):
+            top_n = cl.sort_values(["Entries", "Wins"], ascending=False).head(12)
+            not_won = (top_n["Decided"] - top_n["Wins"]).clip(lower=0)
+            fig = go.Figure()
+            for name, vals, colr in [("Won", top_n["Wins"], GOLD), ("Not won", not_won, "#C9D2E0"),
+                                     ("Awaiting results", top_n["Awaiting"], "#F6D9A8")]:
+                fig.add_bar(y=top_n["Client"], x=vals, name=name, orientation="h", marker_color=colr,
+                            hovertemplate="%{y}: %{x} " + name.lower() + "<extra></extra>")
+            fig.update_layout(barmode="stack", title="Entries by outcome, top 12 clients", bargap=0.35)
+            fig.update_yaxes(categoryorder="array", categoryarray=top_n["Client"].tolist()[::-1], title=None)
+            fig.update_xaxes(dtick=1 if top_n["Entries"].max() <= 12 else None)
+            chart(fig, max(380, 30 * len(top_n) + 120))
+
+        st.write("")
+        section("Client profile", "Pick a client to see every award they were entered in")
+        cpick = st.selectbox("Client", cl["Client"], key="client_pick", label_visibility="collapsed")
+        crow = cl[cl["Client"] == cpick].iloc[0]
+        c = cs[cs["Client"] == cpick]
+        per = c.groupby(["Award", "BU", "Status", "Quarter"], as_index=False)[["Submitted", "Won"]].sum()
+        per["Submitted"] = per[["Submitted", "Won"]].max(axis=1)
+        per["_o"] = per["Status"].map({"Declared": 0, "Pending": 1, "Upcoming": 2})
+        per = per.sort_values(["_o", "Won", "Submitted"], ascending=[True, False, False])
+        items = ""
+        for _, r in per.iterrows():
+            outcome = (f'<span class="aw-v">{int(r.Won)}</span><span class="aw-l"> of {int(r.Submitted)} won</span>'
+                       if r["Status"] == "Declared" else
+                       f'<span class="aw-v">{int(r.Submitted)}</span><span class="aw-l"> entr{"y" if r.Submitted == 1 else "ies"}, awaiting</span>')
+            items += (f'<div class="aw"><div><div class="aw-t">{esc(r["Award"])}</div><div class="aw-m">'
+                      f'{status_pill(r["Status"])}{bu_chips([r["BU"]])}'
+                      f'{"" if r["Quarter"] == "Unassigned" else "· " + esc(r["Quarter"])}</div></div>'
+                      f'<div class="aw-r">{outcome}</div></div>')
+        rate_txt = f"{crow['Rate']:.0%}" if pd.notna(crow["Rate"]) else "–"
+        html_block(CLIENT_CSS + f'''<div class="pf"><div class="pf-top"><div><div class="pf-name">{esc(cpick)}</div>
+            <div style="margin-top:8px">{bu_chips(crow["BUs"])}</div></div>
+            <div class="pf-stats"><div><span class="pf-v">{cu(int(crow["Entries"]))}</span><span class="pf-l">entries</span></div>
+            <div><span class="pf-v gold">{cu(int(crow["Wins"]))}</span><span class="pf-l">awards won</span></div>
+            <div><span class="pf-v">{rate_txt}</span><span class="pf-l">win rate</span></div>
+            <div><span class="pf-v">{cu(int(crow["Awards"]))}</span><span class="pf-l">award programs</span></div></div></div>
+            {items}</div>''', COUNT_UP_JS)
 
 # ----------------------------------------------------------------------------
 # Pipeline: pending + upcoming
@@ -929,7 +1042,8 @@ with t_pipe:
             cards += (f'<div class="k" style="--c:#f2a53c"><div class="l">{esc(when)}</div>'
                       f'<div class="v" style="font-size:16px;white-space:normal">{esc(award)}</div>'
                       f'<div class="s">{esc(date_s)} · BU: {esc(bus)}{" · " + esc(note) if note else ""}</div></div>')
-        html_block(COMMON_HTML_CSS.replace("minmax(150px,1fr)", "minmax(260px,1fr)") + f'<div class="kgrid">{cards}</div>')
+        html_block(COMMON_HTML_CSS + '<style>.kgrid-wide{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));}</style>'
+                   + f'<div class="kgrid kgrid-wide">{cards}</div>')
     pe = df[df["Status"] == "Pending"]
     section("Submitted, awaiting results", f"{int(pe['Submissions'].sum())} submissions across {pe['Award'].nunique()} programs")
     if pe.empty:
