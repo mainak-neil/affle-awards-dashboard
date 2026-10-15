@@ -190,6 +190,45 @@ def normalise_status(s: str) -> str:
     return "Pending" if s else "Pending"
 
 
+def parse_date(value):
+    """Parse one date cell: real dates, ISO text (2026-08-05) or day-first text (05/08/2026)."""
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return pd.NaT
+    if isinstance(value, (pd.Timestamp, datetime)):
+        return pd.Timestamp(value)
+    s = str(value).strip()
+    if not s or s.lower() in {"nan", "nat", "none", "-"}:
+        return pd.NaT
+    iso = bool(re.match(r"^\d{4}-\d{1,2}-\d{1,2}", s))
+    return pd.to_datetime(s, errors="coerce", dayfirst=not iso)
+
+
+def normalise_quarter(value, fy_start: int) -> str | None:
+    """Turn whatever was typed in the Quarter column into 'Q1 FY27' (or 'Q1 2026').
+    Accepts quarter text in many styles, or a date typed in the wrong column."""
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    if isinstance(value, (pd.Timestamp, datetime)):
+        return quarter_label(pd.Timestamp(value), fy_start)[0]
+    s = str(value).strip()
+    if not s or s.lower() in {"nan", "none", "nat", "-"}:
+        return None
+    m = re.search(r"\bQ(?:TR|UARTER)?\s*-?\s*([1-4])\b", s, re.I)
+    if m:
+        q = int(m.group(1))
+        rest = s[:m.start()] + " " + s[m.end():]
+        y = re.search(r"(\d{4}|\d{2})", rest)
+        if not y:
+            return f"Q{q}"
+        yr = int(y.group(1))
+        yr = yr + 2000 if yr < 100 else yr
+        return f"Q{q} {yr}" if fy_start == 1 else f"Q{q} FY{str(yr)[-2:]}"
+    d = parse_date(s)  # a date typed in the Quarter column
+    if pd.notna(d):
+        return quarter_label(d, fy_start)[0]
+    return s
+
+
 def clean_entries(raw: pd.DataFrame, fy_start: int) -> tuple[pd.DataFrame, list[str]]:
     df = raw.copy()
     lookup = {str(c).strip().lower(): c for c in df.columns}
@@ -207,6 +246,7 @@ def clean_entries(raw: pd.DataFrame, fy_start: int) -> tuple[pd.DataFrame, list[
         if c not in df.columns:
             df[c] = None
 
+    df["_q_raw"] = df["Quarter"]
     text_cols = ["Award", "BU", "Status", "Quarter", "Case Studies Submitted", "Case Studies Won", "Notes"]
     for c in text_cols:
         df[c] = df[c].fillna("").astype(str).str.strip().replace({"nan": "", "None": ""})
@@ -219,13 +259,14 @@ def clean_entries(raw: pd.DataFrame, fy_start: int) -> tuple[pd.DataFrame, list[
     df["Status"] = df["Status"].map(normalise_status)
     for c in ["Submission Date", "Result Date"]:
         if not pd.api.types.is_datetime64_any_dtype(df[c]):
-            df[c] = pd.to_datetime(df[c].replace("", None), errors="coerce", dayfirst=True)
+            df[c] = pd.to_datetime(df[c].map(parse_date), errors="coerce")
 
     # Quarter: manual override > Result Date > Submission Date
     labels = []
     for _, r in df.iterrows():
-        if r["Quarter"]:
-            labels.append(r["Quarter"].upper().replace("FY ", "FY"))
+        manual = normalise_quarter(r["_q_raw"], fy_start)
+        if manual:
+            labels.append(manual)
         elif pd.notna(r["Result Date"]):
             labels.append(quarter_label(r["Result Date"], fy_start)[0])
         elif pd.notna(r["Submission Date"]):
@@ -233,6 +274,7 @@ def clean_entries(raw: pd.DataFrame, fy_start: int) -> tuple[pd.DataFrame, list[
         else:
             labels.append("Unassigned")
     df["Quarter"] = labels
+    df = df.drop(columns="_q_raw")
 
     warnings = []
     n_unq = int(((df["Quarter"] == "Unassigned") & (df["Status"] == "Declared")).sum())
