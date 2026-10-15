@@ -250,9 +250,11 @@ def clean_entries(raw: pd.DataFrame, fy_start: int) -> tuple[pd.DataFrame, list[
 def parse_case_studies(text: str) -> list[tuple[str, int]]:
     """'Kissht – 2, Redbus' -> [('Kissht', 2), ('Redbus', 1)]"""
     out = []
+    if str(text or "").strip().lower() in {"", "0", "-", "–", "none", "na", "n/a", "nil", "nan", "no", "not won"}:
+        return out
     for part in str(text or "").split(","):
         part = part.strip()
-        if not part:
+        if not part or part.lower() in {"0", "-", "–", "none", "na", "n/a", "nil"}:
             continue
         m = re.match(r"^(.*?)\s*[–—-]\s*(\d+)\s*$", part)
         out.append((m.group(1).strip(), int(m.group(2))) if m else (part, 1))
@@ -511,7 +513,9 @@ declared_spend = float(declared["Cost (USD)"].sum())
 win_rate = won / declared_subs if declared_subs else 0
 cost_per_win = declared_spend / won if won else 0
 pending_subs = int(df.loc[df.Status == "Pending", "Submissions"].sum())
-programs = df["Award"].nunique()
+participated = df[df["Status"] != "Upcoming"]
+programs = participated["Award"].nunique()  # programs actually entered
+upcoming_programs = df.loc[df["Status"] == "Upcoming", "Award"].nunique()
 
 # ----------------------------------------------------------------------------
 # Hero: headline sentence + animated podium of top BUs by wins
@@ -585,7 +589,7 @@ hero = f"""
       <div><span class="hsv">{cu(win_rate * 100, 0, suf='%')}</span><span class="hsl">win rate on declared</span></div>
       <div><span class="hsv">{cu(spend * FX, 0, pre=SYM, loc=LOC)}</span><span class="hsl">total spend</span></div>
       <div><span class="hsv">{cu(cost_per_win * FX, 0, pre=SYM, loc=LOC)}</span><span class="hsl">cost per award won</span></div>
-      <div><span class="hsv">{cu(programs)}</span><span class="hsl">award programs</span></div>
+      <div><span class="hsv">{cu(programs)}</span><span class="hsl">award programs entered{f" · {upcoming_programs} upcoming" if upcoming_programs else ""}</span></div>
     </div>
   </div>
   {podium}
@@ -594,7 +598,7 @@ hero = f"""
 html_block(hero, COUNT_UP_JS)
 
 mini_cards([
-    ("Total submissions", cu(total_subs), f"{programs} award programs", "#0ea99b"),
+    ("Total submissions", cu(total_subs), f"{programs} award programs entered", "#0ea99b"),
     ("Results declared", cu(declared_subs), f"{declared['Award'].nunique()} programs", "#3b8fd6"),
     ("Awards won", cu(won), f"{win_rate:.0%} win rate", GOLD),
     ("Pending results", cu(pending_subs), f"{df.loc[df.Status == 'Pending', 'Award'].nunique()} programs", "#f2a53c"),
@@ -657,7 +661,7 @@ with t_over:
 
     with st.container(border=True):
         section("Business unit leaderboard", "Ranked by awards won")
-        t = df.groupby("BU").agg(Programs=("Award", "nunique"), Submissions=("Submissions", "sum"),
+        t = df.groupby("BU").agg(Programs=("Award", lambda s: s[df.loc[s.index, "Status"] != "Upcoming"].nunique()), Submissions=("Submissions", "sum"),
                                  Won=("Won", "sum"), Spend=("Cost (USD)", "sum")).reset_index()
         dsub = declared.groupby("BU")["Submissions"].sum()
         t["Win rate"] = (t["Won"] / t["BU"].map(dsub)).where(t["BU"].map(dsub) > 0)
@@ -744,7 +748,7 @@ with t_bu:
         st.markdown(f'<span style="display:inline-flex;background:{NAVY};padding:6px 12px;border-radius:8px">'
                     f'<img src="{uri}" style="max-height:20px"></span>', unsafe_allow_html=True)
     mini_cards([
-        ("Programs entered", cu(b["Award"].nunique()), "", "#0ea99b"),
+        ("Programs entered", cu(b.loc[b["Status"] != "Upcoming", "Award"].nunique()), "excludes upcoming", "#0ea99b"),
         ("Submissions", cu(b["Submissions"].sum()), f"{b_dsubs} declared", "#3b8fd6"),
         ("Won", cu(b_won), f"{(b_won / b_dsubs if b_dsubs else 0):.0%} win rate", GOLD),
         ("Spend", cu(b_spend * FX, 0, pre=SYM, loc=LOC), f"{(b_spend / spend if spend else 0):.0%} of total", "#7c6ff0"),
