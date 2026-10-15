@@ -36,6 +36,7 @@ EXTRA_COLORS = ["#5bb85c", "#8d6e63", "#26a0c9", "#c2185b", "#7cb342", "#455a64"
 STATUS_COLORS = {"Declared": "#0ea99b", "Pending": "#f2a53c", "Upcoming": "#8a8f98"}
 px.defaults.color_discrete_sequence = ["#0ea99b", "#ff7a4a", "#7c6ff0", "#f2a53c", "#ef5da8", "#3b8fd6", "#5bb85c"]
 LOGO_FILES = {
+    "affle": "affle.png",
     "appnext": "appnext.png", "mdsp": "mdsp.png", "mediasmart": "mediasmart.png",
     "newton": "newton.webp", "revx": "revx.webp", "ultra": "ultra.png",
 }
@@ -100,6 +101,18 @@ def load_workbook(source: str) -> tuple[dict[str, pd.DataFrame], str]:
     loaded_at = datetime.now().strftime("%d %b %Y, %H:%M")
     if source == "__local__":
         return pd.read_excel(LOCAL_FILE, sheet_name=None), loaded_at
+
+    # "File -> Share -> Publish to web" link (…/spreadsheets/d/e/2PACX…/pubhtml)
+    pub = re.search(r"/spreadsheets/d/e/([a-zA-Z0-9_-]+)", source)
+    if pub:
+        url = f"https://docs.google.com/spreadsheets/d/e/{pub.group(1)}/pub?output=xlsx"
+        resp = requests.get(url, timeout=30)
+        if resp.status_code != 200 or "text/html" in resp.headers.get("Content-Type", ""):
+            raise PermissionError(
+                "Couldn't read the published sheet. In Google Sheets check File → Share → "
+                "Publish to web → 'Entire document' is published and 'Automatically republish' is on."
+            )
+        return pd.read_excel(io.BytesIO(resp.content), sheet_name=None), loaded_at
 
     sid = sheet_id_from(source)
     sa_info = secret("gcp_service_account")
@@ -246,65 +259,169 @@ def parse_case_studies(text: str) -> list[tuple[str, int]]:
     return out
 
 
+
 # ----------------------------------------------------------------------------
-# Styling
+# Visual system
 # ----------------------------------------------------------------------------
+import html as _html
+import plotly.io as pio
+
+NAVY, INK, MUTED, LINE, GOLD = "#0E1A3A", "#1D2740", "#6A7389", "#E4E8EF", "#E8B44A"
+pio.templates["affle"] = go.layout.Template(layout=dict(
+    font=dict(family="DM Sans, Segoe UI, sans-serif", color=INK, size=12),
+    colorway=["#0ea99b", "#ff7a4a", "#7c6ff0", "#f2a53c", "#ef5da8", "#3b8fd6", "#5bb85c"],
+    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+    xaxis=dict(showgrid=False, linecolor=LINE, ticks="", title=None),
+    yaxis=dict(gridcolor="#EEF1F5", zeroline=False, ticks=""),
+    hoverlabel=dict(bgcolor=NAVY, font=dict(color="white", family="DM Sans"), bordercolor=NAVY),
+    barcornerradius=5,
+    title=dict(font=dict(family="Sora, Segoe UI, Helvetica, Arial, sans-serif", size=15, color=NAVY, weight=700), x=0, xanchor="left"),
+    legend=dict(orientation="h", yanchor="top", y=-0.14, x=0, title=None, font=dict(size=11)),
+    margin=dict(l=8, r=8, t=44, b=8),
+))
+pio.templates.default = "plotly_white+affle"
+
 st.markdown(
     """
 <style>
-  .block-container {padding-top: 2rem; max-width: 1280px;}
-  h1 {font-weight: 800 !important; letter-spacing: -0.015em;}
-  .kpi {background:#fff; border:1px solid #e9eaec; border-top:3px solid var(--c);
-        border-radius:4px; padding:14px 16px 12px; min-height:112px;}
-  .kpi .l {font-size:12px; color:#6b7280; font-weight:600; margin-bottom:6px;}
-  .kpi .n {font-size:26px; font-weight:700; color:#0f1115; line-height:1.15;}
-  .kpi .s {font-size:12px; color:#8a8f98; margin-top:2px;}
-  .section {font-size:19px; font-weight:800; border-bottom:2px solid #0f1115;
-            padding-bottom:6px; margin:18px 0 12px;}
-  .chip {display:inline-flex; align-items:center; background:#152a4a; border-radius:5px;
-         padding:4px 10px; height:28px; margin:0 6px 6px 0;}
-  .chip img {max-height:16px; max-width:80px;}
-  .chip span {color:#fff; font-size:12px; font-weight:600;}
-  div[data-testid="stSidebar"] {background:#fff;}
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
+.stApp {font-family:'DM Sans', 'Segoe UI', sans-serif; background:#F4F6FA;}
+.block-container {padding-top:1.4rem; max-width:1320px;}
+h1,h2,h3,.sora {font-family:'Sora', 'Segoe UI', sans-serif !important; letter-spacing:-0.02em;}
+header[data-testid="stHeader"] {background:transparent;}
+
+/* cards = bordered containers */
+div[data-testid="stLayoutWrapper"] > div[data-testid="stVerticalBlock"],
+div[data-testid="stVerticalBlockBorderWrapper"] {
+  background:#fff; border-color:#E4E8EF !important; border-radius:14px !important;
+  box-shadow:0 1px 2px rgba(14,26,58,.04), 0 6px 18px rgba(14,26,58,.04);}
+
+/* pill tabs */
+.stTabs div[role="tablist"] {display:flex; gap:4px; background:#fff; padding:5px; border-radius:12px;
+  border:1px solid #E4E8EF; overflow-x:auto;}
+.stTabs [role="tab"] {height:38px; padding:0 16px !important; border-radius:9px; white-space:nowrap; margin:0 !important;}
+.stTabs [role="tab"] p {font-weight:600; font-size:14px; color:#4A5470;}
+.stTabs [role="tab"]:hover p {color:#0E1A3A;}
+.stTabs [role="tab"][aria-selected="true"] {background:#0E1A3A;}
+.stTabs [role="tab"][aria-selected="true"] p {color:#fff !important;}
+.stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"], .stTabs .react-aria-SelectionIndicator {display:none;}
+.stTabs [role="tab"] {display:flex; align-items:center; cursor:pointer; transition:background .15s;}
+.stTabs [data-baseweb="tab-panel"], .stTabs div[role="tabpanel"] {padding-top:18px;}
+
+/* section titles */
+.sec {font-family:'Sora',sans-serif; font-size:18px; font-weight:700; color:#0E1A3A; margin:6px 0 2px;}
+.sec-sub {color:#6A7389; font-size:13px; margin-bottom:10px;}
+
+/* sidebar */
+section[data-testid="stSidebar"] {background:#fff; border-right:1px solid #E4E8EF;}
+.side-brand {display:flex; align-items:center; gap:10px; padding:4px 0 14px; border-bottom:1px solid #E4E8EF; margin-bottom:14px;}
+.side-brand img {height:30px; border-radius:6px;}
+.side-brand b {font-family:'Sora',sans-serif; font-size:15px; color:#0E1A3A;}
+
+/* metric (quarter compare) */
+div[data-testid="stMetric"] {background:#fff; border:1px solid #E4E8EF; border-radius:12px; padding:12px 14px;}
+div[data-testid="stMetricValue"] {font-family:'Sora',sans-serif; font-weight:700; color:#0E1A3A;}
+
+/* status pill */
+.pill {display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600;}
 </style>
 """,
     unsafe_allow_html=True,
 )
 
+COMMON_HTML_CSS = """
+<style>
+.kgrid {display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:2px 0 6px;}
+.k {background:#fff; border:1px solid #E4E8EF; border-radius:12px; padding:13px 14px 12px; position:relative; overflow:hidden;}
+.k::before {content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--c,#0ea99b);}
+.k .l {font-size:12.5px; color:#6A7389; font-weight:600;}
+.k .v {font-family:'Sora',sans-serif; font-size:24px; font-weight:700; color:#0E1A3A; margin-top:4px; line-height:1.15; white-space:nowrap;}
+.k .s {font-size:12px; color:#8A92A6; margin-top:3px;}
+</style>
+"""
 
-def kpi(col, label, value, sub="", color="#0ea99b"):
-    col.markdown(
-        f'<div class="kpi" style="--c:{color}"><div class="l">{label}</div>'
-        f'<div class="n">{value}</div><div class="s">{sub}</div></div>',
-        unsafe_allow_html=True,
-    )
+
+def html_block(body: str, js: str = ""):
+    """Render HTML (+ optional JS) without an iframe; falls back to static HTML."""
+    if js:
+        try:
+            st.html(body + f"<script>{js}</script>", unsafe_allow_javascript=True)
+            return
+        except TypeError:  # older Streamlit without JS support
+            pass
+    st.html(body)
+
+
+COUNT_UP_JS = """
+(function(){
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.querySelectorAll('.cu:not([data-done])').forEach(function(el){
+    el.dataset.done = '1';
+    var to = parseFloat(el.dataset.to||'0'), dec = parseInt(el.dataset.dec||'0'),
+        pre = el.dataset.pre||'', suf = el.dataset.suf||'', loc = el.dataset.loc||'en-US';
+    var fmt = function(v){ return pre + v.toLocaleString(loc,{minimumFractionDigits:dec, maximumFractionDigits:dec}) + suf; };
+    var t0 = performance.now(), dur = 1400;
+    function step(t){ var p = Math.min(1,(t-t0)/dur), e = 1-Math.pow(1-p,3); el.textContent = fmt(to*e); if(p<1) requestAnimationFrame(step); }
+    requestAnimationFrame(step);
+  });
+})();
+"""
+
+
+def esc(s) -> str:
+    return _html.escape(str(s))
+
+
+def cu(value: float, dec: int = 0, pre: str = "", suf: str = "", loc: str = "en-US") -> str:
+    """A number that counts up on load; shows the final value if JS is unavailable."""
+    final = f"{pre}{value:,.{dec}f}{suf}"
+    return (f'<span class="cu" data-to="{value}" data-dec="{dec}" data-pre="{esc(pre)}" '
+            f'data-suf="{esc(suf)}" data-loc="{loc}">{esc(final)}</span>')
+
+
+def mini_cards(items):
+    """items: list of (label, value_html, sub, color)."""
+    cards = "".join(
+        f'<div class="k" style="--c:{c}"><div class="l">{esc(l)}</div><div class="v">{v}</div>'
+        f'<div class="s">{esc(s)}</div></div>' for l, v, s, c in items)
+    html_block(COMMON_HTML_CSS + f'<div class="kgrid">{cards}</div>', COUNT_UP_JS)
+
+
+def section(title: str, sub: str = ""):
+    st.markdown(f'<div class="sec">{esc(title)}</div>' + (f'<div class="sec-sub">{esc(sub)}</div>' if sub else ""),
+                unsafe_allow_html=True)
 
 
 def show_df(data, container=None, **kw):
-    """st.dataframe with money/ratio floats rounded to 2 dp."""
     if isinstance(data, pd.DataFrame):
-        num = data.select_dtypes("number").columns
         data = data.copy()
+        num = data.select_dtypes("number").columns
         data[num] = data[num].round(2)
     (container or st).dataframe(data, **kw)
 
 
-def section(title):
-    st.markdown(f'<div class="section">{title}</div>', unsafe_allow_html=True)
+def chart(fig, height=340, container=None):
+    fig.update_layout(template="plotly_white+affle", height=height, legend_title_text=None,
+                      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+    fig.update_xaxes(title=None)
+    (container or st).plotly_chart(fig, width="stretch", theme=None, config={"displaylogo": False})
 
 
-def style_fig(fig, height=340):
-    fig.update_layout(
-        height=height, margin=dict(l=10, r=10, t=40, b=10), plot_bgcolor="white",
-        paper_bgcolor="white", font=dict(family="-apple-system, Segoe UI, Arial", size=12),
-        legend=dict(orientation="h", yanchor="top", y=-0.12, x=0, title=None),
-        title=dict(font=dict(size=14)),
-    )
-    fig.update_xaxes(showgrid=False, title=None)
-    fig.update_yaxes(gridcolor="#eef0f2")
-    fig.update_traces(textangle=0, textposition="outside", cliponaxis=False,
-                      selector=lambda t: t.type == "bar" and t.text is not None and t.orientation != "h")
+def donut(labels, values, colors, title, center_big, center_small):
+    fig = go.Figure(go.Pie(labels=labels, values=values, hole=0.68, sort=False,
+                           marker=dict(colors=colors, line=dict(color="#fff", width=2)),
+                           textinfo="none", hovertemplate="%{label}: %{value:,.0f} (%{percent})<extra></extra>"))
+    fig.update_layout(title=title, showlegend=True,
+                      annotations=[dict(text=f"<b style='font-size:22px'>{center_big}</b><br>"
+                                              f"<span style='font-size:11px;color:{MUTED}'>{center_small}</span>",
+                                        x=0.5, y=0.5, showarrow=False, font=dict(family="Sora, Segoe UI, Helvetica, Arial, sans-serif", color=NAVY))])
     return fig
+
+
+def status_pill(status: str) -> str:
+    bg = {"Declared": "#E3F6F3", "Pending": "#FDF1DE", "Upcoming": "#EEF0F4"}.get(status, "#EEF0F4")
+    fg = {"Declared": "#0B7F74", "Pending": "#A86A0C", "Upcoming": "#59617A"}.get(status, "#59617A")
+    return f'<span class="pill" style="background:{bg};color:{fg}">{esc(status)}</span>'
 
 
 # ----------------------------------------------------------------------------
@@ -312,19 +429,19 @@ def style_fig(fig, height=340):
 # ----------------------------------------------------------------------------
 default_sheet = secret("sheet_url", "")
 with st.sidebar:
-    st.subheader("Data source")
+    logo_uri = logo_data_uri("affle")
+    st.markdown(
+        f'<div class="side-brand">{f"<img src={chr(34)}{logo_uri}{chr(34)}>" if logo_uri else ""}'
+        f'<b>Awards dashboard</b></div>', unsafe_allow_html=True)
     if default_sheet:
         source = default_sheet
-        st.caption("Connected to the Google Sheet set in app secrets.")
     else:
         typed = st.text_input("Google Sheet link", placeholder="https://docs.google.com/spreadsheets/d/…",
-                              help="Share the sheet as 'Anyone with the link – Viewer', or set sheet_url in secrets.")
+                              help="Or set sheet_url in the app's Secrets.")
         source = typed.strip() or "__local__"
-        if source == "__local__":
-            st.caption("Showing the bundled sample file. Paste your sheet link above, or set it in secrets.")
-    if st.button("🔄 Refresh data", width="stretch"):
-        load_workbook.clear()
-        st.rerun()
+        if source == "__local__" and not LOCAL_FILE.exists():
+            st.info("Add your Google Sheet link above, or set `sheet_url` in the app's Secrets.")
+            st.stop()
 
 try:
     tabs, loaded_at = load_workbook(source)
@@ -333,7 +450,7 @@ try:
     if entries_raw is None:
         raise ValueError("No tab named 'Entries' found in the sheet.")
     df_all, data_warnings = clean_entries(entries_raw, settings["fy_start"])
-except Exception as e:  # show a friendly error rather than a stack trace
+except Exception as e:
     st.error(f"**Couldn't load the data.** {e}")
     st.stop()
 
@@ -342,55 +459,49 @@ bus_all = sorted(df_all["BU"].unique(), key=str.lower)
 COLORS = bu_color_map(bus_all)
 
 with st.sidebar:
-    st.caption(f"Last loaded: {loaded_at} · auto-refresh every {CACHE_TTL_SECONDS // 60} min")
-    st.divider()
-    st.subheader("Filters")
     f_quarter = st.multiselect("Quarter", quarters_all, placeholder="All quarters")
-    f_bu = st.multiselect("Business unit", bus_all, placeholder="All BUs")
+    f_bu = st.multiselect("Business unit", bus_all, placeholder="All business units")
     f_status = st.multiselect("Status", ["Declared", "Pending", "Upcoming"], placeholder="All statuses")
     f_award = st.multiselect("Award", sorted(df_all["Award"].unique()), placeholder="All awards")
+    currency = st.segmented_control("Currency", ["US$", "₹"], default="US$") or "US$"
     st.divider()
-    currency = st.radio("Currency", ["US$", "₹"], horizontal=True)
+    if st.button("Refresh data", icon=":material/refresh:", width="stretch"):
+        load_workbook.clear()
+        st.rerun()
+    st.caption(f"{'Live Google Sheet' if source != '__local__' else 'Sample file'} · loaded {loaded_at} · "
+               f"auto-refresh every {CACHE_TTL_SECONDS // 60} min")
 
 df = df_all.copy()
-if f_quarter:
-    df = df[df["Quarter"].isin(f_quarter)]
-if f_bu:
-    df = df[df["BU"].isin(f_bu)]
-if f_status:
-    df = df[df["Status"].isin(f_status)]
-if f_award:
-    df = df[df["Award"].isin(f_award)]
+for col, sel in [("Quarter", f_quarter), ("BU", f_bu), ("Status", f_status), ("Award", f_award)]:
+    if sel:
+        df = df[df[col].isin(sel)]
 
-FX = settings["fx"] if currency == "₹" else 1.0
-SYM = "₹" if currency == "₹" else "$"
+INR = currency == "₹"
+FX = settings["fx"] if INR else 1.0
+SYM = "₹" if INR else "$"
+LOC = "en-IN" if INR else "en-US"
 
 
 def money(v: float, decimals: int = 0) -> str:
-    return f"{SYM}{v * FX:,.{decimals}f}"
+    v = v * FX
+    if INR:  # Indian digit grouping
+        s = f"{abs(v):.{decimals}f}"
+        whole, _, frac = s.partition(".")
+        if len(whole) > 3:
+            head, tail = whole[:-3], whole[-3:]
+            head = ",".join([head[max(0, i - 2):i] for i in range(len(head), 0, -2)][::-1])
+            whole = f"{head},{tail}"
+        return f"{'-' if v < 0 else ''}₹{whole}{'.' + frac if frac else ''}"
+    return f"${v:,.{decimals}f}"
 
-
-# ----------------------------------------------------------------------------
-# Header + KPIs
-# ----------------------------------------------------------------------------
-head_l, head_r = st.columns([0.75, 0.25])
-with head_l:
-    affle_logo = (ASSETS / "affle.png")
-    if affle_logo.exists():
-        st.image(str(affle_logo), width=64)
-    st.title(settings["title"])
-    st.caption("Award submissions, wins and cost by business unit.")
-with head_r:
-    st.markdown(
-        f"<div style='text-align:right;color:#8a8f98;font-size:13px;padding-top:70px'>"
-        f"As of {datetime.now():%d %b %Y}<br>FX: ₹{settings['fx']:.2f} / US$1</div>",
-        unsafe_allow_html=True,
-    )
 
 if df.empty:
-    st.info("No rows match the current filters.")
+    st.info("No rows match the current filters. Clear a filter in the sidebar.")
     st.stop()
 
+# ----------------------------------------------------------------------------
+# Core numbers
+# ----------------------------------------------------------------------------
 declared = df[df["Status"] == "Declared"]
 total_subs = int(df["Submissions"].sum())
 declared_subs = int(declared["Submissions"].sum())
@@ -399,284 +510,467 @@ spend = float(df["Cost (USD)"].sum())
 declared_spend = float(declared["Cost (USD)"].sum())
 win_rate = won / declared_subs if declared_subs else 0
 cost_per_win = declared_spend / won if won else 0
+pending_subs = int(df.loc[df.Status == "Pending", "Submissions"].sum())
+programs = df["Award"].nunique()
 
-k = st.columns(6)
-kpi(k[0], "Total submissions", f"{total_subs:,}", f"{df['Award'].nunique()} award programs", "#0ea99b")
-kpi(k[1], "Results declared", f"{declared_subs:,}", f"{declared['Award'].nunique()} programs", "#ff7a4a")
-kpi(k[2], "Awards won", f"{won:,}", f"{win_rate:.0%} win rate on declared", "#7c6ff0")
-kpi(k[3], "Pending results", f"{int(df.loc[df.Status == 'Pending', 'Submissions'].sum()):,}",
-    f"{df.loc[df.Status == 'Pending', 'Award'].nunique()} programs", "#f2a53c")
-kpi(k[4], "Total spend", money(spend), "all entries with cost", "#3b8fd6")
-kpi(k[5], "Cost / award won", money(cost_per_win, 2), "declared spend ÷ wins", "#ef5da8")
+# ----------------------------------------------------------------------------
+# Hero: headline sentence + animated podium of top BUs by wins
+# ----------------------------------------------------------------------------
+bu_wins = df.groupby("BU")["Won"].sum().sort_values(ascending=False)
+top = [(b, int(w)) for b, w in bu_wins.items() if w > 0][:3]
+order = [1, 0, 2] if len(top) == 3 else ([1, 0] if len(top) == 2 else [0])
+medal = {0: GOLD, 1: "#C3CCD8", 2: "#C98A5A"}
+max_w = max([w for _, w in top], default=1)
+podium_cols = ""
+for idx in order:
+    if idx >= len(top):
+        continue
+    bu, w = top[idx]
+    uri = logo_data_uri(bu)
+    name = f'<img src="{uri}" alt="{esc(bu)}">' if uri else f"<span>{esc(bu)}</span>"
+    h = 46 + 104 * (w / max_w)
+    podium_cols += (
+        f'<div class="pc"><div class="pn">{name}</div><div class="pw">{cu(w)}</div>'
+        f'<div class="pb" style="height:{h:.0f}px;--m:{medal[idx]};animation-delay:{0.15 * (2 - idx):.2f}s">'
+        f'<i>{idx + 1}</i></div></div>')
+podium = (f'<div class="podium"><div class="pt">Most awards won</div><div class="prow">{podium_cols}</div></div>'
+          if top else "")
+
+lede = (f"{cu(won)} awards won from {cu(declared_subs)} declared entries"
+        if declared_subs else f"{cu(total_subs)} submissions in progress")
+hero = f"""
+<style>
+.hero {{position:relative; display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:28px;
+  background:radial-gradient(120% 140% at 100% 0%, #1F3A75 0%, #0E1A3A 55%, #0A132B 100%);
+  border-radius:18px; padding:26px 30px 0; color:#fff; overflow:hidden; margin-bottom:14px;}}
+.hero::after {{content:""; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(115deg, rgba(255,255,255,.025) 0 2px, transparent 2px 22px);}}
+.hl {{padding-bottom:24px; position:relative; z-index:1;}}
+.live {{display:inline-flex; align-items:center; gap:7px; font-size:12px; color:#B9C3DA;
+  background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.1); padding:4px 10px; border-radius:999px;}}
+.live i {{width:7px; height:7px; border-radius:50%; background:#3DDC97; box-shadow:0 0 0 0 rgba(61,220,151,.6);
+  animation:pulse 2s infinite;}}
+@keyframes pulse {{0%{{box-shadow:0 0 0 0 rgba(61,220,151,.55)}}70%{{box-shadow:0 0 0 8px rgba(61,220,151,0)}}100%{{box-shadow:0 0 0 0 rgba(61,220,151,0)}}}}
+.ht {{font-family:'Sora',sans-serif; font-size:15px; font-weight:600; color:#B9C3DA; margin:16px 0 6px;}}
+.hh {{font-family:'Sora',sans-serif; font-size:clamp(26px,3.1vw,40px); font-weight:700; line-height:1.15;
+  letter-spacing:-0.025em; margin:0; max-width:22ch;}}
+.hh .cu {{color:{GOLD};}}
+.hs {{display:flex; flex-wrap:wrap; gap:26px; margin-top:22px;}}
+.hsv {{display:block; font-family:'Sora','Segoe UI',sans-serif; font-size:24px; font-weight:700; color:#fff; line-height:1.2;}}
+.hsl {{display:block; font-size:12.5px; color:#9FAAC4; margin-top:2px;}}
+.podium {{position:relative; z-index:1; display:flex; flex-direction:column; justify-content:flex-end;}}
+.pt {{font-size:12.5px; color:#9FAAC4; text-align:center; margin-bottom:10px;}}
+.prow {{display:flex; align-items:flex-end; justify-content:center; gap:12px;}}
+.pc {{flex:1; max-width:150px; display:flex; flex-direction:column; align-items:center;}}
+.pn {{height:30px; display:flex; align-items:center;}}
+.pn img {{max-height:22px; max-width:110px;}}
+.pn span {{font-weight:600; font-size:13px;}}
+.pw {{font-family:'Sora',sans-serif; font-size:26px; font-weight:700; margin:2px 0 8px;}}
+.pb {{width:100%; border-radius:10px 10px 0 0; position:relative; transform-origin:bottom;
+  background:linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.05));
+  border:1px solid rgba(255,255,255,.14); border-bottom:none; animation:rise .9s cubic-bezier(.2,.8,.2,1) both;}}
+.pb i {{position:absolute; top:10px; left:50%; transform:translateX(-50%); width:26px; height:26px; border-radius:50%;
+  background:var(--m); color:#0E1A3A; font-style:normal; font-weight:800; font-size:13px;
+  display:flex; align-items:center; justify-content:center; font-family:'Sora',sans-serif;}}
+@keyframes rise {{from {{transform:scaleY(0); opacity:.3;}} to {{transform:scaleY(1); opacity:1;}}}}
+@media (prefers-reduced-motion: reduce) {{ .pb, .live i {{animation:none;}} }}
+@media (max-width: 760px) {{ .hero {{grid-template-columns:1fr; padding:22px 20px 0;}} }}
+</style>
+<div class="hero">
+  <div class="hl">
+    <span class="live"><i></i>{'Live from Google Sheets' if source != '__local__' else 'Sample data'} · as of {datetime.now():%d %b %Y}</span>
+    <div class="ht">{esc(settings['title'])}</div>
+    <h1 class="hh">{lede}</h1>
+    <div class="hs">
+      <div><span class="hsv">{cu(win_rate * 100, 0, suf='%')}</span><span class="hsl">win rate on declared</span></div>
+      <div><span class="hsv">{cu(spend * FX, 0, pre=SYM, loc=LOC)}</span><span class="hsl">total spend</span></div>
+      <div><span class="hsv">{cu(cost_per_win * FX, 0, pre=SYM, loc=LOC)}</span><span class="hsl">cost per award won</span></div>
+      <div><span class="hsv">{cu(programs)}</span><span class="hsl">award programs</span></div>
+    </div>
+  </div>
+  {podium}
+</div>
+"""
+html_block(hero, COUNT_UP_JS)
+
+mini_cards([
+    ("Total submissions", cu(total_subs), f"{programs} award programs", "#0ea99b"),
+    ("Results declared", cu(declared_subs), f"{declared['Award'].nunique()} programs", "#3b8fd6"),
+    ("Awards won", cu(won), f"{win_rate:.0%} win rate", GOLD),
+    ("Pending results", cu(pending_subs), f"{df.loc[df.Status == 'Pending', 'Award'].nunique()} programs", "#f2a53c"),
+    ("Total spend", cu(spend * FX, 0, pre=SYM, loc=LOC), "all entries with cost", "#7c6ff0"),
+    ("Cost per award won", cu(cost_per_win * FX, 2, pre=SYM, loc=LOC), "declared spend ÷ wins", "#ef5da8"),
+])
 
 if data_warnings:
-    with st.expander(f"⚠️ {len(data_warnings)} data note(s) — fix these in the Google Sheet"):
+    with st.expander(f"{len(data_warnings)} data note(s) to fix in the Google Sheet", icon=":material/info:"):
         for w in data_warnings:
             st.markdown(f"- {w}")
 
-st.write("")
-tab_overview, tab_q, tab_bu, tab_award, tab_pipe, tab_cs, tab_custom, tab_data = st.tabs(
-    ["Overview", "By quarter", "By BU", "By award", "Pending & upcoming", "Case studies", "Build your own view", "Data"]
-)
+t_over, t_award, t_bu, t_q, t_client, t_pipe, t_custom, t_data = st.tabs(
+    ["Overview", "Awards", "Business units", "Quarters", "Clients", "Pipeline", "Build your own", "Data"])
 
 # ----------------------------------------------------------------------------
 # Overview
 # ----------------------------------------------------------------------------
-with tab_overview:
-    status_sum = df.groupby("Status")["Submissions"].sum()
-    fig = go.Figure()
-    for stt in ["Declared", "Pending", "Upcoming"]:
-        v = int(status_sum.get(stt, 0))
-        if v:
-            fig.add_bar(y=["Status"], x=[v], name=f"{stt} ({v})", orientation="h",
-                        marker_color=STATUS_COLORS[stt], text=[f"{stt} · {v}"],
-                        textposition="inside", insidetextanchor="middle", textfont_color="white")
-    fig.update_layout(barmode="stack", title="Submission status", bargap=0.1)
-    fig.update_yaxes(visible=False)
-    fig.update_xaxes(visible=False)
-    st.plotly_chart(style_fig(fig, 150).update_layout(showlegend=False, margin=dict(t=36, b=0)),
-                    width="stretch")
+with t_over:
+    c1, c2, c3 = st.columns(3)
+    with c1.container(border=True):
+        ss = df.groupby("Status")["Submissions"].sum().reindex(["Declared", "Pending", "Upcoming"]).fillna(0)
+        ss = ss[ss > 0]
+        chart(donut(ss.index, ss.values, [STATUS_COLORS[s] for s in ss.index], "Submission status",
+                    f"{total_subs:,}", "submissions"), 300)
+    with c2.container(border=True):
+        g = go.Figure(go.Indicator(
+            mode="gauge+number", value=win_rate * 100, number=dict(suffix="%", font=dict(family="Sora, Segoe UI, Helvetica, Arial, sans-serif", size=40, color=NAVY)),
+            gauge=dict(axis=dict(range=[0, 100], tickwidth=0, tickcolor="white", tickfont=dict(size=10, color=MUTED)),
+                       bar=dict(color="#0ea99b", thickness=0.32), bgcolor="#EEF1F5", borderwidth=0,
+                       threshold=dict(line=dict(color=GOLD, width=3), thickness=0.8, value=win_rate * 100))))
+        g.update_layout(title="Win rate on declared entries",
+                        annotations=[dict(text=f"{won} won of {declared_subs} declared", x=0.5, y=-0.05,
+                                          showarrow=False, font=dict(size=12, color=MUTED))])
+        chart(g, 300)
+    with c3.container(border=True):
+        sb = df.groupby("BU")["Cost (USD)"].sum().sort_values(ascending=False)
+        sb = sb[sb > 0]
+        chart(donut(sb.index, (sb * FX).values, [COLORS[b] for b in sb.index], f"Spend by BU ({currency})",
+                    money(sb.sum()), "total spend"), 300)
 
-    by_bu = df.groupby("BU", as_index=False)[["Submissions", "Won", "Cost (USD)"]].sum()
-    by_bu["Spend"] = by_bu["Cost (USD)"] * FX
-    c1, c2 = st.columns(2)
-    fig = px.bar(by_bu.sort_values("Won", ascending=False), x="BU", y="Won", color="BU",
-                 color_discrete_map=COLORS, text="Won", title="Awards won per BU")
-    c1.plotly_chart(style_fig(fig).update_layout(showlegend=False), width="stretch")
-    fig = px.bar(by_bu.sort_values("Spend", ascending=False), x="BU", y="Spend", color="BU",
-                 color_discrete_map=COLORS, text_auto=",.0f", title=f"Spend per BU ({currency})")
-    c2.plotly_chart(style_fig(fig).update_layout(showlegend=False), width="stretch")
-
-    c3, c4 = st.columns(2)
-    q = df.groupby(["Quarter", "BU"], as_index=False)["Won"].sum()
-    fig = px.bar(q, x="Quarter", y="Won", color="BU", color_discrete_map=COLORS,
-                 category_orders={"Quarter": quarters_all}, title="Awards won per quarter")
-    c3.plotly_chart(style_fig(fig), width="stretch")
-    fig = px.bar(by_bu.sort_values("Submissions", ascending=False), x="BU", y="Submissions", color="BU",
-                 color_discrete_map=COLORS, text="Submissions", title="Submissions per BU")
-    c4.plotly_chart(style_fig(fig).update_layout(showlegend=False), width="stretch")
-
-# ----------------------------------------------------------------------------
-# By quarter
-# ----------------------------------------------------------------------------
-with tab_q:
-    section("Quarter-wise summary")
-    qs = df.groupby("Quarter").agg(
-        Programs=("Award", "nunique"), Submissions=("Submissions", "sum"), Won=("Won", "sum"),
-        Spend=("Cost (USD)", "sum"),
-    ).reindex([x for x in quarters_all if x in df["Quarter"].unique()]).reset_index()
-    qs["Spend"] = qs["Spend"] * FX
-    qs["Cost / win"] = (qs["Spend"] / qs["Won"]).where(qs["Won"] > 0)
-    show_df(qs, hide_index=True, width="stretch", column_config={
-        "Spend": st.column_config.NumberColumn(f"Spend ({currency})", format="localized"),
-        "Cost / win": st.column_config.NumberColumn(f"Cost / win ({currency})", format="localized"),
-    })
-
-    metric_q = st.selectbox("Show", ["Won", "Submissions", "Spend"], key="qmetric")
-    val_col = "Cost (USD)" if metric_q == "Spend" else metric_q
-    piv = df.pivot_table(index="BU", columns="Quarter", values=val_col, aggfunc="sum", fill_value=0)
-    piv = piv[[c for c in quarters_all if c in piv.columns]] * (FX if metric_q == "Spend" else 1)
-    piv["Total"] = piv.sum(axis=1)
-    piv.loc["Total"] = piv.sum()
-    section(f"{metric_q} — BU × quarter")
-    piv = piv.sort_index(key=lambda i: [(x == "Total", str(x).lower()) for x in i])
-    show_df(piv.round(0), width="stretch")
-
-    trend = piv.drop(index="Total", columns=["Total", "Unassigned"], errors="ignore")
-    trend = trend.reset_index().melt(id_vars="BU", var_name="Quarter", value_name=metric_q)
-    fig = px.line(trend, x="Quarter", y=metric_q, color="BU", markers=True, color_discrete_map=COLORS,
-                  category_orders={"Quarter": quarters_all}, title=f"{metric_q} trend by BU (dated rows only)")
-    st.plotly_chart(style_fig(fig), width="stretch")
-
-# ----------------------------------------------------------------------------
-# By BU
-# ----------------------------------------------------------------------------
-with tab_bu:
-    section("Spend & submissions by BU")
-    chips = ""
-    for bu in sorted(df["BU"].unique(), key=str.lower):
-        uri = logo_data_uri(bu)
-        chips += f'<span class="chip">{f"<img src={chr(34)}{uri}{chr(34)}>" if uri else f"<span>{bu}</span>"}</span>'
-    st.markdown(chips, unsafe_allow_html=True)
-
-    t = df.groupby("BU").agg(
-        Submissions=("Submissions", "sum"), Declared=("Submissions", lambda s: s[df.loc[s.index, "Status"] == "Declared"].sum()),
-        Won=("Won", "sum"), Spend=("Cost (USD)", "sum"), Programs=("Award", "nunique"),
-    ).reset_index()
-    t["Win rate"] = (t["Won"] / t["Declared"]).where(t["Declared"] > 0)
-    t["% of spend"] = t["Spend"] / t["Spend"].sum() if t["Spend"].sum() else 0
-    t["Cost / submission"] = (t["Spend"] / t["Submissions"]).where(t["Submissions"] > 0) * FX
-    t["Cost / win"] = (t["Spend"] / t["Won"]).where(t["Won"] > 0) * FX
-    t["Spend"] = t["Spend"] * FX
-    t = t.sort_values("Spend", ascending=False)
-    show_df(t, hide_index=True, width="stretch", column_config={
-        "Spend": st.column_config.NumberColumn(f"Spend ({currency})", format="localized"),
-        "% of spend": st.column_config.ProgressColumn("% of spend", format="percent", min_value=0, max_value=1),
-        "Win rate": st.column_config.ProgressColumn("Win rate", format="percent", min_value=0, max_value=1),
-        "Cost / submission": st.column_config.NumberColumn(f"Cost / submission ({currency})", format="localized"),
-        "Cost / win": st.column_config.NumberColumn(f"Cost / win ({currency})", format="localized"),
-    })
-    st.caption(f"Totals: {int(t['Submissions'].sum())} submissions · {int(t['Won'].sum())} won · "
-               f"{money(t['Spend'].sum() / FX, 2)} spend")
-
-# ----------------------------------------------------------------------------
-# By award
-# ----------------------------------------------------------------------------
-with tab_award:
-    section("Cost / awards won (declared awards)")
-    d = df[df["Status"] == "Declared"]
-    if d.empty:
-        st.info("No declared awards in the current filter.")
-    else:
-        aw = d.groupby("Award").agg(
-            Quarter=("Quarter", lambda s: ", ".join(sorted(set(s), key=quarter_sort_key))),
-            Submissions=("Submissions", "sum"), Won=("Won", "sum"), Cost=("Cost (USD)", "sum"),
-        ).reset_index()
-        split = d.groupby("Award").apply(
-            lambda g: ", ".join(f"{b} – {int(s)}" for b, s in zip(g["BU"], g["Submissions"])), include_groups=False
-        )
-        aw.insert(2, "BU split", aw["Award"].map(split))
-        aw["Win rate"] = (aw["Won"] / aw["Submissions"]).where(aw["Submissions"] > 0)
-        aw["Cost / win"] = (aw["Cost"] / aw["Won"]).where(aw["Won"] > 0) * FX
-        aw["Cost"] = aw["Cost"] * FX
-        show_df(aw.sort_values("Won", ascending=False), hide_index=True, width="stretch", column_config={
-            "Award": st.column_config.TextColumn(width="large"),
-            "Cost": st.column_config.NumberColumn(f"Cost ({currency})", format="localized"),
-            "Cost / win": st.column_config.NumberColumn(f"Cost / win ({currency})", format="localized"),
-            "Win rate": st.column_config.ProgressColumn("Win rate", format="percent", min_value=0, max_value=1),
-        })
-        st.caption(f"Total: {int(aw['Submissions'].sum())} submissions · {int(aw['Won'].sum())} won · "
-                   f"{SYM}{aw['Cost'].sum():,.2f} · cost per award won {SYM}{(aw['Cost'].sum() / aw['Won'].sum() if aw['Won'].sum() else 0):,.2f}")
-
-        fig = px.bar(d.groupby(["Award", "BU"], as_index=False)["Won"].sum(), y="Award", x="Won", color="BU",
-                     orientation="h", color_discrete_map=COLORS, title="Wins per award, split by BU")
+    c4, c5 = st.columns([1, 1.15])
+    with c4.container(border=True):
+        q = df.groupby(["Quarter", "BU"], as_index=False)["Won"].sum()
+        fig = px.bar(q, x="Quarter", y="Won", color="BU", color_discrete_map=COLORS,
+                     category_orders={"Quarter": quarters_all}, title="Awards won per quarter")
+        chart(fig, 360)
+    with c5.container(border=True):
+        ac = df.groupby(["Award", "BU"], as_index=False)["Cost (USD)"].sum()
+        ac = ac[ac["Cost (USD)"] > 0]
+        ac["Spend"] = ac["Cost (USD)"] * FX
+        top_aw = ac.groupby("Award")["Spend"].sum().nlargest(8).index
+        ac = ac[ac["Award"].isin(top_aw)]
+        ac["Short"] = ac["Award"].str.slice(0, 38) + ac["Award"].map(lambda s: "…" if len(s) > 38 else "")
+        fig = px.bar(ac, y="Short", x="Spend", color="BU", orientation="h", color_discrete_map=COLORS,
+                     title=f"Award-wise total cost, top 8 ({currency})", hover_data={"Award": True, "Short": False})
         fig.update_yaxes(categoryorder="total ascending", title=None)
-        st.plotly_chart(style_fig(fig, max(320, 42 * d["Award"].nunique())), width="stretch")
+        fig.update_xaxes(title=None)
+        chart(fig, 360)
 
-# ----------------------------------------------------------------------------
-# Pending & upcoming
-# ----------------------------------------------------------------------------
-with tab_pipe:
-    for status, title in [("Pending", "Awards submitted — not yet declared"), ("Upcoming", "Upcoming award submissions")]:
-        section(title)
-        p = df[df["Status"] == status]
-        if p.empty:
-            st.caption("None in the current filter.")
-            continue
-        pt = p.groupby("Award").agg(
-            Date=("Submission Date", "min"), Submissions=("Submissions", "sum"),
-            BUs=("BU", lambda s: ", ".join(f"{b} – {int(n)}" if n else b for b, n in zip(s, p.loc[s.index, "Submissions"]))),
-            Notes=("Notes", lambda s: "; ".join(sorted({x for x in s if x}))),
-        ).reset_index().rename(columns={"Date": "Submission / due date"})
-        show_df(pt, hide_index=True, width="stretch", column_config={
-            "Submission / due date": st.column_config.DateColumn(format="DD MMM YYYY"),
-            "Award": st.column_config.TextColumn(width="large"),
+    with st.container(border=True):
+        section("Business unit leaderboard", "Ranked by awards won")
+        t = df.groupby("BU").agg(Programs=("Award", "nunique"), Submissions=("Submissions", "sum"),
+                                 Won=("Won", "sum"), Spend=("Cost (USD)", "sum")).reset_index()
+        dsub = declared.groupby("BU")["Submissions"].sum()
+        t["Win rate"] = (t["Won"] / t["BU"].map(dsub)).where(t["BU"].map(dsub) > 0)
+        t["Share of spend"] = t["Spend"] / t["Spend"].sum() if t["Spend"].sum() else 0
+        t["Cost per win"] = (t["Spend"] / t["Won"]).where(t["Won"] > 0) * FX
+        t["Spend"] = t["Spend"] * FX
+        show_df(t.sort_values(["Won", "Spend"], ascending=False), hide_index=True, width="stretch", column_config={
+            "Spend": st.column_config.NumberColumn(f"Spend ({currency})", format="localized"),
+            "Cost per win": st.column_config.NumberColumn(f"Cost per win ({currency})", format="localized"),
+            "Win rate": st.column_config.ProgressColumn(format="percent", min_value=0, max_value=1),
+            "Share of spend": st.column_config.ProgressColumn(format="percent", min_value=0, max_value=1),
         })
 
 # ----------------------------------------------------------------------------
-# Case studies
+# Awards explorer
 # ----------------------------------------------------------------------------
-with tab_cs:
+with t_award:
+    aw = df.groupby("Award").agg(
+        Status=("Status", lambda s: s.mode().iat[0]),
+        Quarter=("Quarter", lambda s: ", ".join(sorted(set(s), key=quarter_sort_key))),
+        BUs=("BU", "nunique"), Submissions=("Submissions", "sum"), Won=("Won", "sum"),
+        Cost=("Cost (USD)", "sum")).reset_index()
+    aw["Win rate"] = (aw["Won"] / aw["Submissions"]).where((aw["Status"] == "Declared") & (aw["Submissions"] > 0))
+    aw["Cost per win"] = (aw["Cost"] / aw["Won"]).where(aw["Won"] > 0)
+    aw = aw.sort_values("Cost", ascending=False)
+
+    pick = st.selectbox("Choose an award", aw["Award"], index=0, key="award_pick")
+    a = df[df["Award"] == pick]
+    ar = aw[aw["Award"] == pick].iloc[0]
+    st.markdown(f"{status_pill(ar['Status'])} &nbsp;<span style='color:{MUTED};font-size:13px'>"
+                f"Quarter: {esc(ar['Quarter'])}</span>", unsafe_allow_html=True)
+    mini_cards([
+        ("Total cost", cu(ar["Cost"] * FX, 2, pre=SYM, loc=LOC), f"across {int(ar['BUs'])} BU(s)", "#7c6ff0"),
+        ("Submissions", cu(ar["Submissions"]), "entries", "#0ea99b"),
+        ("Won", cu(ar["Won"]), "awards", GOLD),
+        ("Win rate", f"{ar['Win rate']:.0%}" if pd.notna(ar["Win rate"]) else "–", "on this award", "#3b8fd6"),
+        ("Cost per win", money(ar["Cost per win"], 2) if pd.notna(ar["Cost per win"]) else "–", "", "#ef5da8"),
+    ])
+    c1, c2 = st.columns(2)
+    with c1.container(border=True):
+        cs = a.groupby("BU")["Cost (USD)"].sum()
+        cs = cs[cs > 0]
+        if cs.empty:
+            st.caption("No cost entered for this award yet.")
+        else:
+            chart(donut(cs.index, (cs * FX).values, [COLORS[b] for b in cs.index], f"Cost split by BU ({currency})",
+                        money(cs.sum()), "total"), 300)
+    with c2.container(border=True):
+        sw = a.groupby("BU", as_index=False)[["Submissions", "Won"]].sum().melt(id_vars="BU", var_name="Metric")
+        fig = px.bar(sw, x="BU", y="value", color="Metric", barmode="group", text="value",
+                     color_discrete_map={"Submissions": "#C9D2E0", "Won": GOLD}, title="Submissions vs won by BU")
+        fig.update_traces(textposition="outside", cliponaxis=False)
+        fig.update_yaxes(title=None)
+        chart(fig, 300)
+    detail = a[["BU", "Status", "Submissions", "Won", "Cost (USD)", "Case Studies Submitted", "Case Studies Won", "Notes"]].copy()
+    detail["Cost (USD)"] = detail["Cost (USD)"] * FX
+    show_df(detail.rename(columns={"Cost (USD)": f"Cost ({currency})"}), hide_index=True, width="stretch")
+
+    st.write("")
+    with st.container(border=True):
+        section("All awards by total cost", "Every award program, highest spend first")
+        tbl = aw.copy()
+        tbl["Cost"] = tbl["Cost"] * FX
+        tbl["Cost per win"] = tbl["Cost per win"] * FX
+        show_df(tbl, hide_index=True, width="stretch", column_config={
+            "Award": st.column_config.TextColumn(width="large"),
+            "Cost": st.column_config.ProgressColumn(f"Total cost ({currency})", format="localized",
+                                                    min_value=0, max_value=float(tbl["Cost"].max() or 1)),
+            "Cost per win": st.column_config.NumberColumn(f"Cost per win ({currency})", format="localized"),
+            "Win rate": st.column_config.ProgressColumn(format="percent", min_value=0, max_value=1),
+        })
+
+# ----------------------------------------------------------------------------
+# Business unit explorer
+# ----------------------------------------------------------------------------
+with t_bu:
+    bu_rank = df.groupby("BU")["Cost (USD)"].sum().sort_values(ascending=False).index.tolist()
+    bpick = st.selectbox("Choose a business unit", bu_rank, key="bu_pick")
+    b = df[df["BU"] == bpick]
+    bd = b[b["Status"] == "Declared"]
+    b_won, b_dsubs, b_spend = int(b["Won"].sum()), int(bd["Submissions"].sum()), float(b["Cost (USD)"].sum())
+    uri = logo_data_uri(bpick)
+    if uri:
+        st.markdown(f'<span style="display:inline-flex;background:{NAVY};padding:6px 12px;border-radius:8px">'
+                    f'<img src="{uri}" style="max-height:20px"></span>', unsafe_allow_html=True)
+    mini_cards([
+        ("Programs entered", cu(b["Award"].nunique()), "", "#0ea99b"),
+        ("Submissions", cu(b["Submissions"].sum()), f"{b_dsubs} declared", "#3b8fd6"),
+        ("Won", cu(b_won), f"{(b_won / b_dsubs if b_dsubs else 0):.0%} win rate", GOLD),
+        ("Spend", cu(b_spend * FX, 0, pre=SYM, loc=LOC), f"{(b_spend / spend if spend else 0):.0%} of total", "#7c6ff0"),
+        ("Cost per win", money(bd["Cost (USD)"].sum() / b_won, 2) if b_won else "–", "declared spend ÷ wins", "#ef5da8"),
+    ])
+    c1, c2 = st.columns([1.2, 1])
+    with c1.container(border=True):
+        bc = b.groupby(["Award", "Status"], as_index=False)["Cost (USD)"].sum()
+        bc = bc[bc["Cost (USD)"] > 0]
+        bc["Spend"] = bc["Cost (USD)"] * FX
+        bc["Short"] = bc["Award"].str.slice(0, 36) + bc["Award"].map(lambda s: "…" if len(s) > 36 else "")
+        if bc.empty:
+            st.caption("No cost entered for this BU yet.")
+        else:
+            fig = px.bar(bc, y="Short", x="Spend", color="Status", orientation="h", color_discrete_map=STATUS_COLORS,
+                         title=f"Cost by award ({currency})", hover_data={"Award": True, "Short": False})
+            fig.update_yaxes(categoryorder="total ascending", title=None)
+            fig.update_xaxes(title=None)
+            chart(fig, max(300, 46 * len(bc) + 80))
+    with c2.container(border=True):
+        bq = b.groupby("Quarter", as_index=False)["Won"].sum()
+        fig = px.bar(bq, x="Quarter", y="Won", text="Won", category_orders={"Quarter": quarters_all},
+                     color_discrete_sequence=[COLORS.get(bpick, "#0ea99b")], title="Awards won by quarter")
+        fig.update_traces(textposition="outside", cliponaxis=False)
+        fig.update_yaxes(title=None)
+        chart(fig, 300)
+    bt = b[["Award", "Status", "Quarter", "Submissions", "Won", "Cost (USD)", "Case Studies Won"]].copy()
+    bt["Cost (USD)"] = bt["Cost (USD)"] * FX
+    show_df(bt.rename(columns={"Cost (USD)": f"Cost ({currency})"}).sort_values("Won", ascending=False),
+            hide_index=True, width="stretch", column_config={"Award": st.column_config.TextColumn(width="large")})
+
+# ----------------------------------------------------------------------------
+# Quarters: compare two quarters + BU × quarter grid
+# ----------------------------------------------------------------------------
+with t_q:
+    qs = [x for x in quarters_all if x in df["Quarter"].unique()]
+    dated = [x for x in qs if x != "Unassigned"]
+    if len(qs) < 2:
+        st.info("Add Result Dates (or a Quarter) in the sheet to compare quarters. "
+                "Right now everything falls in one quarter.")
+    else:
+        c1, c2 = st.columns(2)
+        qa = c1.selectbox("Compare", qs, index=max(0, len(dated) - 2) if len(dated) >= 2 else 0, key="qa")
+        qb = c2.selectbox("with", qs, index=qs.index(dated[-1]) if dated else len(qs) - 1, key="qb")
+
+        def qstats(qq):
+            d = df[df["Quarter"] == qq]
+            dd = d[d["Status"] == "Declared"]
+            w, ds = d["Won"].sum(), dd["Submissions"].sum()
+            return dict(subs=d["Submissions"].sum(), won=w, spend=d["Cost (USD)"].sum() * FX,
+                        rate=(w / ds * 100) if ds else 0, prog=d["Award"].nunique())
+
+        A, B = qstats(qa), qstats(qb)
+        m = st.columns(5)
+        m[0].metric(f"Submissions · {qb}", f"{B['subs']:,.0f}", f"{B['subs'] - A['subs']:+,.0f} vs {qa}")
+        m[1].metric(f"Awards won · {qb}", f"{B['won']:,.0f}", f"{B['won'] - A['won']:+,.0f} vs {qa}")
+        m[2].metric(f"Spend · {qb}", money(B["spend"] / FX), f"{'+' if B['spend'] >= A['spend'] else '-'}{SYM}{abs(B['spend'] - A['spend']):,.0f} vs {qa}",
+                    delta_color="inverse")
+        m[3].metric(f"Win rate · {qb}", f"{B['rate']:.0f}%", f"{B['rate'] - A['rate']:+.0f} pts vs {qa}")
+        m[4].metric(f"Programs · {qb}", f"{B['prog']}", f"{B['prog'] - A['prog']:+d} vs {qa}")
+
+        with st.container(border=True):
+            cmp_ = df[df["Quarter"].isin([qa, qb])].groupby(["BU", "Quarter"], as_index=False)["Won"].sum()
+            fig = px.bar(cmp_, x="BU", y="Won", color="Quarter", barmode="group", text="Won",
+                         color_discrete_sequence=["#C9D2E0", "#0ea99b"], category_orders={"Quarter": [qa, qb]},
+                         title=f"Awards won by BU: {qa} vs {qb}")
+            fig.update_traces(textposition="outside", cliponaxis=False)
+            fig.update_yaxes(title=None)
+            chart(fig, 340)
+
+    with st.container(border=True):
+        section("Business unit × quarter grid")
+        metric_q = st.segmented_control("Show", ["Won", "Submissions", "Spend"], default="Won", key="qmetric") or "Won"
+        val_col = "Cost (USD)" if metric_q == "Spend" else metric_q
+        piv = df.pivot_table(index="BU", columns="Quarter", values=val_col, aggfunc="sum", fill_value=0)
+        piv = piv[[c for c in quarters_all if c in piv.columns]] * (FX if metric_q == "Spend" else 1)
+        piv["Total"] = piv.sum(axis=1)
+        piv = piv.sort_values("Total", ascending=False)
+        piv.loc["Total"] = piv.sum()
+        st.dataframe(piv.style.format("{:,.0f}"), width="stretch")
+
+# ----------------------------------------------------------------------------
+# Clients explorer
+# ----------------------------------------------------------------------------
+with t_client:
     recs = []
     for _, r in df.iterrows():
         for name, n in parse_case_studies(r["Case Studies Submitted"]):
-            recs.append({"BU": r["BU"], "Award": r["Award"], "Case study": name, "Submitted": n, "Won": 0})
+            recs.append(dict(Client=name, BU=r["BU"], Award=r["Award"], Status=r["Status"], Submitted=n, Won=0))
         for name, n in parse_case_studies(r["Case Studies Won"]):
-            recs.append({"BU": r["BU"], "Award": r["Award"], "Case study": name, "Submitted": 0, "Won": n})
+            recs.append(dict(Client=name, BU=r["BU"], Award=r["Award"], Status=r["Status"], Submitted=0, Won=n))
     if not recs:
-        st.info("No case studies listed for the current filter. Fill the 'Case Studies Submitted / Won' columns in the sheet.")
+        st.info("No clients listed yet. Fill the 'Case Studies Submitted / Won' columns in the sheet.")
     else:
         cs = pd.DataFrame(recs)
-        section("Platform / case-study wise")
-        cs_bu = cs.groupby(["BU", "Case study"], as_index=False)[["Submitted", "Won"]].sum()
-        cs_bu = cs_bu.sort_values(["BU", "Submitted"], ascending=[True, False])
-        c1, c2 = st.columns([0.45, 0.55])
-        show_df(cs_bu, c1, hide_index=True, width="stretch", height=420)
-        fig = px.bar(cs_bu.sort_values("Won"), y="Case study", x=["Submitted", "Won"], barmode="group",
-                     orientation="h", title="Submitted vs won by case study",
-                     color_discrete_sequence=["#c9ced6", "#0ea99b"])
-        fig.update_yaxes(title=None)
-        c2.plotly_chart(style_fig(fig, max(420, 22 * cs_bu["Case study"].nunique())), width="stretch")
-
-        section("Award-wise case studies submitted / won")
-        aw_cs = df[(df["Case Studies Submitted"] != "") | (df["Case Studies Won"] != "")][
-            ["BU", "Award", "Submissions", "Case Studies Submitted", "Case Studies Won"]]
-        show_df(aw_cs, hide_index=True, width="stretch")
+        cl = cs.groupby("Client", as_index=False)[["Submitted", "Won"]].sum().sort_values(["Won", "Submitted"], ascending=False)
+        c1, c2 = st.columns([1, 1.25])
+        with c1:
+            cpick = st.selectbox("Choose a client / case study", cl["Client"], key="client_pick")
+            c = cs[cs["Client"] == cpick]
+            mini_cards([
+                ("Entries", cu(c["Submitted"].sum()), "case-study submissions", "#0ea99b"),
+                ("Wins", cu(c["Won"].sum()), "awards won", GOLD),
+                ("Awards", cu(c["Award"].nunique()), f"via {', '.join(sorted(c['BU'].unique()))}", "#3b8fd6"),
+            ])
+            ct = c.groupby(["Award", "BU", "Status"], as_index=False)[["Submitted", "Won"]].sum()
+            show_df(ct, hide_index=True, width="stretch")
+        with c2.container(border=True):
+            topc = cl.head(12).melt(id_vars="Client", var_name="Metric")
+            fig = px.bar(topc, y="Client", x="value", color="Metric", orientation="h", barmode="group",
+                         color_discrete_map={"Submitted": "#C9D2E0", "Won": GOLD}, title="Top clients by awards won")
+            fig.update_yaxes(categoryorder="array", categoryarray=cl.head(12)["Client"].tolist()[::-1], title=None)
+            fig.update_xaxes(title=None)
+            chart(fig, max(360, 34 * min(12, len(cl)) + 90))
 
 # ----------------------------------------------------------------------------
-# Build your own view (pivot builder)
+# Pipeline: pending + upcoming
 # ----------------------------------------------------------------------------
-with tab_custom:
-    st.caption("Pick any combination — the chart and table update instantly. Uses the sidebar filters too.")
+with t_pipe:
+    today = pd.Timestamp(datetime.now().date())
+    up = df[df["Status"] == "Upcoming"]
+    if not up.empty:
+        section("Upcoming submissions")
+        cards = ""
+        for award, g in up.groupby("Award"):
+            d = g["Submission Date"].min()
+            if pd.notna(d):
+                days = (d - today).days
+                when = "Due today" if days == 0 else (f"Due in {days} day{'s' if days != 1 else ''}" if days > 0
+                                                      else f"Deadline passed {-days} day(s) ago")
+                date_s = d.strftime("%d %b %Y")
+            else:
+                when, date_s = "No deadline set", ""
+            note = "; ".join(sorted({n for n in g["Notes"] if n}))
+            bus = ", ".join(sorted(b for b in g["BU"].unique()))
+            cards += (f'<div class="k" style="--c:#f2a53c"><div class="l">{esc(when)}</div>'
+                      f'<div class="v" style="font-size:16px;white-space:normal">{esc(award)}</div>'
+                      f'<div class="s">{esc(date_s)} · BU: {esc(bus)}{" · " + esc(note) if note else ""}</div></div>')
+        html_block(COMMON_HTML_CSS.replace("minmax(150px,1fr)", "minmax(260px,1fr)") + f'<div class="kgrid">{cards}</div>')
+    pe = df[df["Status"] == "Pending"]
+    section("Submitted, awaiting results", f"{int(pe['Submissions'].sum())} submissions across {pe['Award'].nunique()} programs")
+    if pe.empty:
+        st.caption("Nothing pending in the current filter.")
+    else:
+        pt = pe.groupby("Award").apply(lambda g: pd.Series({
+            "Submitted on": g["Submission Date"].min(), "Submissions": g["Submissions"].sum(),
+            "BU split": ", ".join(f"{b} – {int(n)}" for b, n in zip(g["BU"], g["Submissions"])),
+            f"Cost ({currency})": g["Cost (USD)"].sum() * FX,
+        }), include_groups=False).reset_index()
+        show_df(pt, hide_index=True, width="stretch", column_config={
+            "Submitted on": st.column_config.DateColumn(format="DD MMM YYYY"),
+            "Award": st.column_config.TextColumn(width="large")})
+
+# ----------------------------------------------------------------------------
+# Build your own view
+# ----------------------------------------------------------------------------
+with t_custom:
+    st.caption("Pick any combination. The chart and table update instantly and respect the sidebar filters.")
     dims = ["BU", "Quarter", "Award", "Status"]
-    metrics = {"Awards won": "Won", "Submissions": "Submissions", f"Spend ({currency})": "Cost (USD)",
-               "Win rate": None, f"Cost per win ({currency})": None, "Award programs": None}
+    metrics = ["Awards won", "Submissions", f"Spend ({currency})", "Win rate", f"Cost per win ({currency})", "Award programs"]
     c1, c2, c3, c4 = st.columns(4)
     row_dim = c1.selectbox("Group by", dims, index=1)
     split_dim = c2.selectbox("Split by", ["(none)"] + [d_ for d_ in dims if d_ != row_dim])
-    metric = c3.selectbox("Metric", list(metrics))
-    chart = c4.selectbox("Chart", ["Bar", "Stacked bar", "Line", "Pie", "Table only"])
+    metric = c3.selectbox("Metric", metrics)
+    chart_t = c4.selectbox("Chart", ["Bar", "Stacked bar", "Line", "Donut", "Table only"])
 
     keys = [row_dim] + ([] if split_dim == "(none)" else [split_dim])
     g = df.groupby(keys).agg(Won=("Won", "sum"), Submissions=("Submissions", "sum"),
                              Cost=("Cost (USD)", "sum"), Programs=("Award", "nunique")).reset_index()
-    decl = df[df["Status"] == "Declared"].groupby(keys).agg(
-        DSubs=("Submissions", "sum"), DCost=("Cost (USD)", "sum")).reset_index()
+    decl = declared.groupby(keys).agg(DSubs=("Submissions", "sum"), DCost=("Cost (USD)", "sum")).reset_index()
     g = g.merge(decl, on=keys, how="left").fillna({"DSubs": 0, "DCost": 0})
     if metric == "Awards won":
         g["Value"] = g["Won"]
     elif metric == "Submissions":
         g["Value"] = g["Submissions"]
-    elif metric.startswith("Spend"):
-        g["Value"] = g["Cost"] * FX
+    elif metric == "Award programs":
+        g["Value"] = g["Programs"]
     elif metric == "Win rate":
         g["Value"] = (g["Won"] / g["DSubs"]).where(g["DSubs"] > 0)
-    elif metric.startswith("Cost per win"):
-        g["Value"] = (g["DCost"] / g["Won"]).where(g["Won"] > 0) * FX
+    elif metric.startswith("Spend"):
+        g["Value"] = g["Cost"] * FX
     else:
-        g["Value"] = g["Programs"]
+        g["Value"] = (g["DCost"] / g["Won"]).where(g["Won"] > 0) * FX
 
     orders = {"Quarter": quarters_all, "Status": ["Declared", "Pending", "Upcoming"]}
     color = None if split_dim == "(none)" else split_dim
     cmap = COLORS if color == "BU" else (STATUS_COLORS if color == "Status" else None)
-    if chart != "Table only":
-        if chart == "Pie":
-            fig = px.pie(g.groupby(row_dim, as_index=False)["Value"].sum(), names=row_dim, values="Value",
-                         hole=0.45, color=row_dim, color_discrete_map=COLORS if row_dim == "BU" else None)
-        elif chart == "Line":
-            fig = px.line(g, x=row_dim, y="Value", color=color, markers=True, color_discrete_map=cmap,
-                          category_orders=orders)
-        else:
-            fig = px.bar(g, x=row_dim, y="Value", color=color, color_discrete_map=cmap or
-                         (COLORS if row_dim == "BU" else None), category_orders=orders,
-                         barmode="stack" if chart == "Stacked bar" else "group")
-        fig.update_layout(title=f"{metric} by {row_dim}" + ("" if not color else f", split by {color}"),
-                          yaxis_title=metric)
-        if metric == "Win rate":
-            fig.update_yaxes(tickformat=".0%")
-        st.plotly_chart(style_fig(fig, 420), width="stretch")
-
+    if chart_t != "Table only":
+        with st.container(border=True):
+            if chart_t == "Donut":
+                gg = g.groupby(row_dim, as_index=False)["Value"].sum()
+                cols = [COLORS.get(x) if row_dim == "BU" else STATUS_COLORS.get(x) for x in gg[row_dim]]
+                fig = donut(gg[row_dim], gg["Value"], cols if all(cols) else None, f"{metric} by {row_dim}",
+                            f"{gg['Value'].sum():,.0f}", metric.lower())
+            elif chart_t == "Line":
+                fig = px.line(g, x=row_dim, y="Value", color=color, markers=True, color_discrete_map=cmap,
+                              category_orders=orders)
+            else:
+                fig = px.bar(g, x=row_dim, y="Value", color=color,
+                             color_discrete_map=cmap or (COLORS if row_dim == "BU" else None),
+                             category_orders=orders, barmode="stack" if chart_t == "Stacked bar" else "group")
+            if chart_t != "Donut":
+                fig.update_layout(title=f"{metric} by {row_dim}" + (f", split by {color}" if color else ""),
+                                  yaxis_title=metric)
+            if metric == "Win rate" and chart_t != "Donut":
+                fig.update_yaxes(tickformat=".0%")
+            chart(fig, 420)
     if color:
         tbl = g.pivot_table(index=row_dim, columns=split_dim, values="Value", aggfunc="sum")
-        if row_dim in orders:
-            tbl = tbl.reindex([x for x in orders[row_dim] if x in tbl.index])
     else:
         tbl = g.set_index(row_dim)[["Value"]].rename(columns={"Value": metric})
-        if row_dim in orders:
-            tbl = tbl.reindex([x for x in orders[row_dim] if x in tbl.index])
+    if row_dim in orders:
+        tbl = tbl.reindex([x for x in orders[row_dim] if x in tbl.index])
     st.dataframe(tbl.style.format("{:.0%}" if metric == "Win rate" else "{:,.0f}", na_rep="–"), width="stretch")
 
 # ----------------------------------------------------------------------------
 # Raw data
 # ----------------------------------------------------------------------------
-with tab_data:
-    st.caption("These are the rows from the 'Entries' tab after applying the sidebar filters. "
-               "To change anything, edit the Google Sheet and press Refresh data.")
-    show = df.drop(columns=[c for c in df.columns if c not in COLUMN_ALIASES])
+with t_data:
+    st.caption("Rows from the 'Entries' tab after the sidebar filters. To change anything, edit the Google Sheet "
+               "and press Refresh data.")
+    show = df[[c for c in df.columns if c in COLUMN_ALIASES]]
     show_df(show, hide_index=True, width="stretch", column_config={
         "Submission Date": st.column_config.DateColumn(format="DD MMM YYYY"),
         "Result Date": st.column_config.DateColumn(format="DD MMM YYYY"),
         "Cost (USD)": st.column_config.NumberColumn(format="localized"),
     })
-    st.download_button("⬇️ Download filtered data (CSV)", show.to_csv(index=False).encode(),
-                       "awards_filtered.csv", "text/csv")
+    st.download_button("Download filtered data (CSV)", show.to_csv(index=False).encode(), "awards_filtered.csv",
+                       "text/csv", icon=":material/download:")
