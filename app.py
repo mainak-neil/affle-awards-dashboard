@@ -684,10 +684,14 @@ for idx in order:
     name = f'<img src="{uri}" alt="{esc(bu)}">' if uri else f"<span>{esc(bu)}</span>"
     h = 46 + 104 * (w / max_w)
     podium_cols += (
-        f'<div class="pc"><div class="pn">{name}</div><div class="pw">{cu(w)}</div>'
+        f'<div class="pc{" first" if idx == 0 else ""}">{"<div class=beam></div>" if idx == 0 else ""}'
+        f'<div class="pn">{name}</div><div class="pw">{cu(w)}</div>'
         f'<div class="pb" style="height:{h:.0f}px;--m:{medal[idx]};animation-delay:{0.15 * (2 - idx):.2f}s">'
         f'<i>{idx + 1}</i></div></div>')
-podium = (f'<div class="podium"><div class="pt">Most awards won</div><div class="prow">{podium_cols}</div></div>'
+SPARKS = "".join(f'<i class="spk" style="left:{x}%;animation-delay:{d}s;animation-duration:{t}s;--s:{z}px"></i>'
+                 for x, d, t, z in [(12, 0, 5.5, 4), (24, 1.8, 6.5, 3), (38, 3.2, 5, 5), (47, .8, 7, 3), (55, 2.6, 6, 4),
+                                    (63, 4.1, 5.8, 3), (74, 1.2, 6.8, 5), (86, 3.6, 5.4, 3)])
+podium = (f'<div class="podium">{SPARKS}<div class="pt">Most awards won</div><div class="prow">{podium_cols}</div></div>'
           if top else "")
 
 lede = (f"{cu(won)} awards won from {cu(declared_subs)} declared entries"
@@ -697,8 +701,16 @@ hero = f"""
 .hero {{position:relative; display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:28px;
   background:radial-gradient(120% 140% at 100% 0%, #1F3A75 0%, #0E1A3A 55%, #0A132B 100%);
   border-radius:18px; padding:26px 30px 0; color:#fff; overflow:hidden; margin-bottom:14px;}}
-.hero::after {{content:""; position:absolute; inset:0; pointer-events:none;
-  background:repeating-linear-gradient(115deg, rgba(255,255,255,.025) 0 2px, transparent 2px 22px);}}
+.hero::after {{content:""; position:absolute; inset:-40px; pointer-events:none;
+  background:repeating-linear-gradient(115deg, rgba(255,255,255,.028) 0 2px, transparent 2px 22px);
+  animation:drift 38s linear infinite;}}
+@keyframes drift {{from{{transform:translateX(0)}} to{{transform:translateX(-46px)}}}}
+.aur {{position:absolute; border-radius:50%; filter:blur(60px); pointer-events:none; z-index:0; opacity:.55;}}
+.a1 {{width:420px; height:420px; background:#2F63D6; top:-180px; right:8%; animation:floatA 16s ease-in-out infinite alternate;}}
+.a2 {{width:340px; height:340px; background:#0ea99b; bottom:-200px; left:-60px; opacity:.32; animation:floatB 19s ease-in-out infinite alternate;}}
+.a3 {{width:260px; height:260px; background:#7c6ff0; top:20%; left:42%; opacity:.22; animation:floatA 22s ease-in-out infinite alternate-reverse;}}
+@keyframes floatA {{0%{{transform:translate(0,0) scale(1)}} 100%{{transform:translate(-70px,50px) scale(1.15)}}}}
+@keyframes floatB {{0%{{transform:translate(0,0) scale(1)}} 100%{{transform:translate(90px,-40px) scale(1.1)}}}}
 .hl {{padding-bottom:24px; position:relative; z-index:1;}}
 .live {{display:inline-flex; align-items:center; gap:7px; font-size:12px; color:#B9C3DA;
   background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.1); padding:4px 10px; border-radius:999px;}}
@@ -708,14 +720,37 @@ hero = f"""
 .ht {{font-family:'Sora',sans-serif; font-size:15px; font-weight:600; color:#B9C3DA; margin:16px 0 6px;}}
 .hh {{font-family:'Sora',sans-serif; font-size:clamp(26px,3.1vw,40px); font-weight:700; line-height:1.15;
   letter-spacing:-0.025em; margin:0; max-width:22ch;}}
-.hh .cu {{color:{GOLD};}}
+.hh .cu {{color:{GOLD}; background:linear-gradient(100deg, {GOLD} 0%, {GOLD} 38%, #FFF0C8 50%, {GOLD} 62%, {GOLD} 100%);
+  background-size:250% 100%; background-position:100% 0; -webkit-background-clip:text; background-clip:text;
+  -webkit-text-fill-color:transparent; animation:shimmer 6s ease-in-out 1.8s infinite;}}
+@keyframes shimmer {{0%{{background-position:100% 0}} 35%{{background-position:0% 0}} 100%{{background-position:0% 0}}}}
+.hs > div {{animation:fadeUp .7s cubic-bezier(.2,.8,.2,1) both;}}
+.hs > div:nth-child(1){{animation-delay:.35s}} .hs > div:nth-child(2){{animation-delay:.47s}}
+.hs > div:nth-child(3){{animation-delay:.59s}} .hs > div:nth-child(4){{animation-delay:.71s}}
+@keyframes fadeUp {{from{{opacity:0; transform:translateY(10px)}} to{{opacity:1; transform:none}}}}
 .hs {{display:flex; flex-wrap:wrap; gap:26px; margin-top:22px;}}
 .hsv {{display:block; font-family:'Sora','Segoe UI',sans-serif; font-size:24px; font-weight:700; color:#fff; line-height:1.2;}}
 .hsl {{display:block; font-size:12.5px; color:#9FAAC4; margin-top:2px;}}
 .podium {{position:relative; z-index:1; display:flex; flex-direction:column; justify-content:flex-end;}}
 .pt {{font-size:12.5px; color:#9FAAC4; text-align:center; margin-bottom:10px;}}
 .prow {{display:flex; align-items:flex-end; justify-content:center; gap:12px;}}
-.pc {{flex:1; max-width:150px; display:flex; flex-direction:column; align-items:center;}}
+.pc {{flex:1; max-width:150px; display:flex; flex-direction:column; align-items:center; position:relative;}}
+.beam {{position:absolute; left:50%; top:-70px; width:190%; height:calc(100% + 70px); transform:translateX(-50%);
+  pointer-events:none; z-index:0;
+  background:conic-gradient(from 155deg at 50% 0%, transparent 0deg, rgba(232,180,74,.22) 14deg,
+             rgba(255,236,190,.42) 25deg, rgba(232,180,74,.22) 36deg, transparent 50deg);
+  -webkit-mask:linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
+          mask:linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
+  animation:beam 4.5s ease-in-out infinite;}}
+.pc.first .pn, .pc.first .pw, .pc.first .pb {{position:relative; z-index:1;}}
+.pc.first .pb {{box-shadow:0 -12px 40px rgba(232,180,74,.18), inset 0 1px 0 rgba(255,255,255,.18);}}
+.pc.first .pb i {{box-shadow:0 0 0 0 rgba(232,180,74,.6); animation:medal 2.8s ease-in-out 1.2s infinite;}}
+@keyframes beam {{0%,100%{{opacity:.55}} 50%{{opacity:1}}}}
+@keyframes medal {{0%{{box-shadow:0 0 0 0 rgba(232,180,74,.55)}} 70%{{box-shadow:0 0 0 10px rgba(232,180,74,0)}} 100%{{box-shadow:0 0 0 0 rgba(232,180,74,0)}}}}
+.spk {{position:absolute; bottom:0; width:var(--s); height:var(--s); border-radius:50%; z-index:0; pointer-events:none;
+  background:#FFE3A1; box-shadow:0 0 8px 2px rgba(232,180,74,.55); opacity:0; animation:rise2 6s ease-in infinite;}}
+@keyframes rise2 {{0%{{transform:translateY(0) scale(.6); opacity:0}} 15%{{opacity:.9}} 80%{{opacity:.6}}
+  100%{{transform:translateY(-230px) translateX(14px) scale(1.1); opacity:0}}}}
 .pn {{height:30px; display:flex; align-items:center;}}
 .pn img {{max-height:22px; max-width:110px;}}
 .pn span {{font-weight:600; font-size:13px;}}
@@ -727,10 +762,12 @@ hero = f"""
   background:var(--m); color:#0E1A3A; font-style:normal; font-weight:800; font-size:13px;
   display:flex; align-items:center; justify-content:center; font-family:'Sora',sans-serif;}}
 @keyframes rise {{from {{transform:scaleY(0); opacity:.3;}} to {{transform:scaleY(1); opacity:1;}}}}
-@media (prefers-reduced-motion: reduce) {{ .pb, .live i {{animation:none;}} }}
+@media (prefers-reduced-motion: reduce) {{ .pb, .live i, .aur, .hero::after, .hh .cu, .hs > div, .beam, .spk,
+  .pc.first .pb i {{animation:none !important;}} .spk {{display:none;}} .hh .cu {{background-position:0 0;}} }}
 @media (max-width: 760px) {{ .hero {{grid-template-columns:1fr; padding:22px 20px 0;}} }}
 </style>
 <div class="hero">
+  <div class="aur a1"></div><div class="aur a2"></div><div class="aur a3"></div>
   <div class="hl">
     <span class="live"><i></i>{'Live from Google Sheets' if source != '__local__' else 'Sample data'} · as of {datetime.now():%d %b %Y}</span>
     <div class="ht">{esc(settings['title'])}</div>
