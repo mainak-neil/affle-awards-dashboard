@@ -357,10 +357,86 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
 .sec-sub {color:#6A7389; font-size:13px; margin-bottom:10px;}
 
 /* sidebar */
-section[data-testid="stSidebar"] {background:#fff; border-right:1px solid #E4E8EF;}
-.side-brand {display:flex; align-items:center; gap:10px; padding:4px 0 14px; border-bottom:1px solid #E4E8EF; margin-bottom:14px;}
-.side-brand img {height:30px; border-radius:6px;}
-.side-brand b {font-family:'Sora',sans-serif; font-size:15px; color:#0E1A3A;}
+section[data-testid="stSidebar"] {border-right:none !important;
+  background:radial-gradient(140% 55% at 0% 0%, rgba(42,78,156,.55) 0%, rgba(42,78,156,0) 62%),
+             radial-gradient(90% 40% at 100% 100%, rgba(14,169,155,.16) 0%, rgba(14,169,155,0) 70%),
+             linear-gradient(180deg,#0E1A3A 0%,#0B1630 100%) !important;}
+section[data-testid="stSidebar"]::before {content:""; position:absolute; inset:0 0 auto 0; height:3px; z-index:2;
+  background:linear-gradient(90deg,#0ea99b,#E8B44A,#7c6ff0);}
+section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {color:#AEB8D0 !important; font-size:12.5px !important; font-weight:600 !important;}
+section[data-testid="stSidebar"] div[data-baseweb="select"] > div {background:rgba(255,255,255,.055) !important;
+  border:1px solid rgba(255,255,255,.12) !important; border-radius:11px !important; min-height:42px;
+  transition:border-color .2s ease, box-shadow .2s ease, background .2s ease;}
+section[data-testid="stSidebar"] div[data-baseweb="select"] > div:hover {border-color:rgba(14,169,155,.75) !important;
+  background:rgba(255,255,255,.085) !important;}
+section[data-testid="stSidebar"] div[data-baseweb="select"] > div:focus-within {border-color:#E8B44A !important;
+  box-shadow:0 0 0 3px rgba(232,180,74,.18), 0 0 22px rgba(232,180,74,.12) !important;}
+section[data-testid="stSidebar"] div[data-baseweb="select"] div, section[data-testid="stSidebar"] div[data-baseweb="select"] input {color:#C9D1E3 !important;}
+section[data-testid="stSidebar"] div[data-baseweb="select"] svg {fill:#9FAAC4 !important; color:#9FAAC4 !important;}
+section[data-testid="stSidebar"] span[data-baseweb="tag"] {background:#E8B44A !important; border-radius:999px !important;
+  animation:sbPop .25s ease both;}
+section[data-testid="stSidebar"] span[data-baseweb="tag"], section[data-testid="stSidebar"] span[data-baseweb="tag"] * {color:#0E1A3A !important; fill:#0E1A3A !important; font-weight:600;}
+section[data-testid="stSidebar"] .stMultiSelect .react-aria-ComboBox > div[role="group"],
+section[data-testid="stSidebar"] .stTextInput [data-testid="stTextInputRootElement"] {background:rgba(255,255,255,.055) !important;
+  border:1px solid rgba(255,255,255,.12) !important; border-radius:11px !important; min-height:42px;
+  transition:border-color .2s ease, box-shadow .2s ease, background .2s ease;}
+section[data-testid="stSidebar"] .stMultiSelect .react-aria-ComboBox > div[role="group"]:hover,
+section[data-testid="stSidebar"] .stTextInput [data-testid="stTextInputRootElement"]:hover {border-color:rgba(14,169,155,.75) !important; background:rgba(255,255,255,.085) !important;}
+section[data-testid="stSidebar"] .stMultiSelect .react-aria-ComboBox > div[role="group"]:focus-within,
+section[data-testid="stSidebar"] .stTextInput [data-testid="stTextInputRootElement"]:focus-within {border-color:#E8B44A !important;
+  box-shadow:0 0 0 3px rgba(232,180,74,.18), 0 0 22px rgba(232,180,74,.12) !important;}
+section[data-testid="stSidebar"] .stMultiSelect input, section[data-testid="stSidebar"] .stTextInput input {color:#E3E8F3 !important; background:transparent !important;}
+section[data-testid="stSidebar"] .stMultiSelect input::placeholder, section[data-testid="stSidebar"] .stTextInput input::placeholder {color:#AEB8D0 !important; opacity:1;}
+section[data-testid="stSidebar"] .stMultiSelect button svg {color:#AEB8D0 !important;}
+section[data-testid="stSidebar"] .stMultiSelect [data-tag] {background:#E8B44A !important; border-radius:999px !important; animation:sbPop .25s ease both;}
+section[data-testid="stSidebar"] .stMultiSelect [data-tag], section[data-testid="stSidebar"] .stMultiSelect [data-tag] * {color:#0E1A3A !important; font-weight:600;}
+section[data-testid="stSidebar"] [data-testid="stTooltipIcon"] svg {color:#AEB8D0 !important;}
+section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button {background:rgba(255,255,255,.055) !important;
+  border-color:rgba(255,255,255,.14) !important; transition:background .2s ease;}
+section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button p {color:#C9D1E3 !important; font-weight:600;}
+section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[kind*="Active"],
+section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[aria-checked="true"],
+section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[aria-pressed="true"] {background:#E8B44A !important; border-color:#E8B44A !important;}
+section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[kind*="Active"] p,
+section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[aria-checked="true"] p,
+section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[aria-pressed="true"] p {color:#0E1A3A !important;}
+section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] {border:none !important; border-radius:11px !important;
+  background:linear-gradient(135deg,#12B5A6,#0B8F84) !important; box-shadow:0 6px 18px rgba(14,169,155,.28);
+  transition:transform .15s ease, box-shadow .15s ease;}
+section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover {transform:translateY(-1px);
+  box-shadow:0 10px 24px rgba(14,169,155,.38);}
+section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] *, section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] p {color:#fff !important; font-weight:600;}
+section[data-testid="stSidebar"] [data-testid="stBaseButton-tertiary"] p, section[data-testid="stSidebar"] [data-testid="stBaseButton-tertiary"] span {color:#E8B44A !important; font-size:12.5px !important; font-weight:600;}
+section[data-testid="stSidebar"] [data-testid="stBaseButton-tertiary"]:hover p {color:#FFD27A !important;}
+section[data-testid="stSidebar"] hr {border-color:rgba(255,255,255,.1) !important;}
+section[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] svg, section[data-testid="stSidebar"] button[kind="header"] svg {fill:#AEB8D0 !important; color:#AEB8D0 !important;}
+.sb-brand {display:flex; align-items:center; gap:12px; padding:14px; margin:4px 0 18px; border-radius:14px;
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09);}
+.sb-brand img {height:36px; border-radius:8px; box-shadow:0 0 0 1px rgba(255,255,255,.14), 0 6px 16px rgba(0,0,0,.25);}
+.sb-brand b {display:block; font-family:'Sora','Segoe UI',sans-serif; font-size:15.5px; color:#fff; letter-spacing:-0.01em;}
+.sb-brand span {display:flex; align-items:center; gap:6px; font-size:12px; color:#9FAAC4; margin-top:3px;}
+.sb-dot {width:7px; height:7px; border-radius:50%; background:#3DDC97; display:inline-block; animation:sbPulse 2s infinite;}
+.sb-sec {display:flex; align-items:center; justify-content:space-between; margin:0 0 6px;}
+.sb-sec b {font-family:'Sora','Segoe UI',sans-serif; font-size:13px; color:#fff; letter-spacing:.01em;}
+.sb-sec em {font-style:normal; font-size:11.5px; font-weight:600; color:#0E1A3A; background:#E8B44A; padding:2px 8px; border-radius:999px;}
+.sb-sec em.off {background:rgba(255,255,255,.08); color:#9FAAC4;}
+.sb-status {margin-top:6px; padding:12px 14px; border-radius:12px; background:rgba(255,255,255,.045);
+  border:1px solid rgba(255,255,255,.08); font-size:12px; color:#9FAAC4; line-height:1.6;}
+.sb-status .r {display:flex; align-items:center; gap:7px; color:#E3E8F3; font-weight:600; font-size:12.5px; margin-bottom:2px;}
+@keyframes sbPulse {0%{box-shadow:0 0 0 0 rgba(61,220,151,.55)}70%{box-shadow:0 0 0 7px rgba(61,220,151,0)}100%{box-shadow:0 0 0 0 rgba(61,220,151,0)}}
+@keyframes sbIn {from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none}}
+@keyframes sbPop {from{transform:scale(.85); opacity:0} to{transform:scale(1); opacity:1}}
+section[data-testid="stSidebar"] [data-testid="stElementContainer"] {animation:sbIn .5s cubic-bezier(.2,.8,.2,1) both;}
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:nth-child(2){animation-delay:.04s}
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:nth-child(3){animation-delay:.08s}
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:nth-child(4){animation-delay:.12s}
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:nth-child(5){animation-delay:.16s}
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:nth-child(6){animation-delay:.20s}
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:nth-child(7){animation-delay:.24s}
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:nth-child(8){animation-delay:.28s}
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:nth-child(n+9){animation-delay:.32s}
+@media (prefers-reduced-motion: reduce) {
+  section[data-testid="stSidebar"] [data-testid="stElementContainer"], .sb-dot, section[data-testid="stSidebar"] span[data-baseweb="tag"] {animation:none !important;}}
 
 /* metric (quarter compare) */
 div[data-testid="stMetric"] {background:#fff; border:1px solid #E4E8EF; border-radius:12px; padding:12px 14px;}
@@ -474,9 +550,11 @@ def status_pill(status: str) -> str:
 default_sheet = secret("sheet_url", "")
 with st.sidebar:
     logo_uri = logo_data_uri("affle")
+    live_txt = "Live from Google Sheets" if default_sheet else "Connect your sheet"
     st.markdown(
-        f'<div class="side-brand">{f"<img src={chr(34)}{logo_uri}{chr(34)}>" if logo_uri else ""}'
-        f'<b>Awards dashboard</b></div>', unsafe_allow_html=True)
+        f'<div class="sb-brand">{f"<img src={chr(34)}{logo_uri}{chr(34)} alt={chr(34)}Affle{chr(34)}>" if logo_uri else ""}'
+        f'<div><b>Awards dashboard</b><span><i class="sb-dot"></i>{live_txt}</span></div></div>',
+        unsafe_allow_html=True)
     if default_sheet:
         source = default_sheet
     else:
@@ -502,18 +580,34 @@ quarters_all = sorted(df_all["Quarter"].unique(), key=quarter_sort_key)
 bus_all = sorted(df_all["BU"].unique(), key=str.lower)
 COLORS = bu_color_map(bus_all)
 
+FILTER_KEYS = ("f_quarter", "f_bu", "f_status", "f_award")
+
+
+def _clear_filters():
+    for k in FILTER_KEYS:
+        st.session_state[k] = []
+
+
 with st.sidebar:
-    f_quarter = st.multiselect("Quarter", quarters_all, placeholder="All quarters")
-    f_bu = st.multiselect("Business unit", bus_all, placeholder="All business units")
-    f_status = st.multiselect("Status", ["Declared", "Pending", "Upcoming"], placeholder="All statuses")
-    f_award = st.multiselect("Award", sorted(df_all["Award"].unique()), placeholder="All awards")
+    n_active = sum(1 for k in FILTER_KEYS if st.session_state.get(k))
+    st.markdown(f'<div class="sb-sec"><b>Filters</b><em class="{"" if n_active else "off"}">'
+                f'{n_active if n_active else "None"} active</em></div>', unsafe_allow_html=True)
+    f_quarter = st.multiselect("Quarter", quarters_all, placeholder="All quarters", key="f_quarter")
+    f_bu = st.multiselect("Business unit", bus_all, placeholder="All business units", key="f_bu")
+    f_status = st.multiselect("Status", ["Declared", "Pending", "Upcoming"], placeholder="All statuses", key="f_status")
+    f_award = st.multiselect("Award", sorted(df_all["Award"].unique()), placeholder="All awards", key="f_award")
+    if n_active:
+        st.button("Clear all filters", type="tertiary", icon=":material/close:", on_click=_clear_filters)
     currency = st.segmented_control("Currency", ["US$", "₹"], default="US$") or "US$"
     st.divider()
     if st.button("Refresh data", icon=":material/refresh:", width="stretch"):
         load_workbook.clear()
         st.rerun()
-    st.caption(f"{'Live Google Sheet' if source != '__local__' else 'Sample file'} · loaded {loaded_at} · "
-               f"auto-refresh every {CACHE_TTL_SECONDS // 60} min")
+    st.markdown(
+        f'<div class="sb-status"><div class="r"><i class="sb-dot"></i>'
+        f'{"Live Google Sheet" if source != "__local__" else "Sample file"}</div>'
+        f'Last loaded {loaded_at}<br>Auto-refresh every {CACHE_TTL_SECONDS // 60} min</div>',
+        unsafe_allow_html=True)
 
 df = df_all.copy()
 for col, sel in [("Quarter", f_quarter), ("BU", f_bu), ("Status", f_status), ("Award", f_award)]:
