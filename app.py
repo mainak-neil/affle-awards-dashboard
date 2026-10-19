@@ -329,7 +329,21 @@ st.markdown(
     """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
-.stApp {font-family:'DM Sans', 'Segoe UI', sans-serif; background:#F4F6FA;}
+.stApp {font-family:'DM Sans', 'Segoe UI', sans-serif;
+  background:
+    radial-gradient(1100px 560px at 88% -8%, rgba(59,143,214,.24), rgba(59,143,214,0) 62%),
+    radial-gradient(820px 480px at -4% 18%, rgba(14,169,155,.16), rgba(14,169,155,0) 60%),
+    radial-gradient(900px 520px at 55% 108%, rgba(232,180,74,.14), rgba(232,180,74,0) 60%),
+    linear-gradient(180deg, #EEF2F9 0%, #F5F7FB 40%, #F2F5FA 100%) !important;
+  background-attachment:fixed !important;}
+.stApp::before {content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image:radial-gradient(rgba(14,26,58,.085) 1px, transparent 1.2px);
+  background-size:22px 22px;
+  -webkit-mask-image:linear-gradient(180deg, rgba(0,0,0,.9), rgba(0,0,0,.35) 55%, rgba(0,0,0,.15));
+          mask-image:linear-gradient(180deg, rgba(0,0,0,.9), rgba(0,0,0,.35) 55%, rgba(0,0,0,.15));}
+[data-testid="stAppViewContainer"], [data-testid="stMain"], .main {background:transparent !important;}
+[data-testid="stMain"] {position:relative; z-index:1;}
+[data-testid="stExpander"] details {background:#fff; border-radius:12px;}
 .block-container {padding-top:1.4rem; max-width:1320px;}
 h1,h2,h3,.sora {font-family:'Sora', 'Segoe UI', sans-serif !important; letter-spacing:-0.02em;}
 header[data-testid="stHeader"] {background:transparent;}
