@@ -846,6 +846,8 @@ bu_spend = df.groupby("BU")["Cost (USD)"].sum().sort_values(ascending=False)
 bu_spend = bu_spend[bu_spend > 0]
 top_bu = bu_spend.index[0] if len(bu_spend) else None
 per_entry = spend / total_subs if total_subs else 0
+undeclared_spend = spend - declared_spend          # pending + upcoming entries
+all_in_cost_per_win = spend / won if won else 0     # declared + not declared spend ÷ wins
 alt_cost = (f"₹{cost_per_win * settings['fx']:,.0f}" if not INR else f"${cost_per_win:,.2f}")
 
 cards = [
@@ -866,14 +868,14 @@ cards = [
              f'<div class="dots">{"".join("<i></i>" for _ in range(min(pending_programs, 8)))}</div>'
              f'<div class="kleg"><span>{upcoming_subs_n} upcoming program{"s" if upcoming_subs_n != 1 else ""}</span></div>'),
     kpi_card("#7c6ff0", "wallet", "Total spend", cu(spend * FX, 0, pre=SYM, loc=LOC),
-             f"top: {top_bu} {bu_spend.iloc[0] / spend:.0%}" if top_bu and spend else "all entries with cost",
-             seg_bar([(v, COLORS.get(b, "#8A92A6"), b) for b, v in bu_spend.items()])
-             + '<div class="kleg">' + "".join(f'<span><b style="background:{COLORS.get(b, "#8A92A6")}"></b>{esc(b)}</span>'
-                                             for b in bu_spend.index[:4]) + "</div>"),
+             "declared + not declared",
+             seg_bar([(declared_spend, "#7c6ff0", "Declared"), (undeclared_spend, "#C9C2FA", "Not declared")])
+             + f'<div class="kleg"><span><b style="background:#7c6ff0"></b>Declared {money(declared_spend)}</span>'
+               f'<span><b style="background:#C9C2FA"></b>Not declared {money(undeclared_spend)}</span></div>'),
     kpi_card("#ef5da8", "target", "Cost per award won", cu(cost_per_win * FX, 2, pre=SYM, loc=LOC),
              "declared spend ÷ wins",
-             f'<div class="alt"><span>Per entry</span><b>{money(per_entry, 0)}</b></div>'
-             f'<div class="alt" style="margin-top:6px"><span>In {"US$" if INR else "₹"}</span><b>{alt_cost}</b></div>'),
+             f'<div class="alt"><span>All spend ÷ wins</span><b>{money(all_in_cost_per_win, 2)}</b></div>'
+             f'<div class="alt" style="margin-top:6px"><span>Per entry</span><b>{money(per_entry, 0)}</b></div>'),
 ]
 html_block(KPI_CSS + f'<div class="kx">{"".join(cards)}</div>', COUNT_UP_JS)
 
