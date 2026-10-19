@@ -747,14 +747,135 @@ hero = f"""
 """
 html_block(hero, COUNT_UP_JS)
 
-mini_cards([
-    ("Total submissions", cu(total_subs), f"{programs} award programs entered", "#0ea99b"),
-    ("Results declared", cu(declared_subs), f"{declared['Award'].nunique()} programs", "#3b8fd6"),
-    ("Awards won", cu(won), f"{win_rate:.0%} win rate", GOLD),
-    ("Pending results", cu(pending_subs), f"{df.loc[df.Status == 'Pending', 'Award'].nunique()} programs", "#f2a53c"),
-    ("Total spend", cu(spend * FX, 0, pre=SYM, loc=LOC), "all entries with cost", "#7c6ff0"),
-    ("Cost per award won", cu(cost_per_win * FX, 2, pre=SYM, loc=LOC), "declared spend ÷ wins", "#ef5da8"),
-])
+# ---- KPI strip: icon + animated mini-visual per card --------------------------------
+KPI_CSS = """
+<style>
+.kx {display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:12px; margin:2px 0 8px;}
+@media (max-width:1560px){ .kx {grid-template-columns:repeat(3,minmax(0,1fr));} }
+@media (max-width:760px){ .kx {grid-template-columns:repeat(2,minmax(0,1fr));} }
+.kc {position:relative; background:#fff; border:1px solid #E4E8EF; border-radius:16px; padding:15px 16px 14px;
+  overflow:hidden; display:flex; flex-direction:column; min-height:168px;
+  box-shadow:0 1px 2px rgba(14,26,58,.04), 0 8px 22px rgba(14,26,58,.05);
+  transition:transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+  animation:kIn .6s cubic-bezier(.2,.8,.2,1) both;}
+.kc:nth-child(2){animation-delay:.05s}.kc:nth-child(3){animation-delay:.1s}.kc:nth-child(4){animation-delay:.15s}
+.kc:nth-child(5){animation-delay:.2s}.kc:nth-child(6){animation-delay:.25s}
+.kc::before {content:""; position:absolute; inset:0 0 auto 0; height:3px;
+  background:linear-gradient(90deg, var(--c), color-mix(in srgb, var(--c) 30%, transparent));}
+.kc::after {content:""; position:absolute; top:0; bottom:0; left:-60%; width:45%; pointer-events:none;
+  background:linear-gradient(105deg, transparent, rgba(255,255,255,.65), transparent); transform:skewX(-18deg); opacity:0;}
+.kc:hover {transform:translateY(-4px); border-color:color-mix(in srgb, var(--c) 40%, #E4E8EF);
+  box-shadow:0 18px 36px color-mix(in srgb, var(--c) 18%, rgba(14,26,58,.08));}
+.kc:hover::after {animation:kShine .9s ease;}
+.kt {display:flex; align-items:center; gap:10px;}
+.ki {width:34px; height:34px; border-radius:10px; flex:none; display:flex; align-items:center; justify-content:center;
+  background:color-mix(in srgb, var(--c) 13%, #fff); color:var(--c);}
+.ki img {width:18px; height:18px; display:block;}
+.kl {font-size:13px; font-weight:600; color:#4A5470; line-height:1.25;}
+.kv-row {display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:12px;}
+.kv {font-family:'Sora','Segoe UI',sans-serif; font-size:29px; font-weight:700; color:#0E1A3A; line-height:1.05;
+  letter-spacing:-0.02em; white-space:nowrap;}
+.ks {font-size:12px; color:#6A7389; margin-top:4px;}
+.kz {margin-top:auto; padding-top:12px;}
+.seg {display:flex; height:7px; border-radius:99px; overflow:hidden; background:#EEF1F5; gap:2px;}
+.seg i {display:block; height:100%; transform-origin:left; animation:kGrow 1.1s cubic-bezier(.2,.8,.2,1) both;}
+.seg i:first-child {border-radius:99px 0 0 99px;} .seg i:last-child {border-radius:0 99px 99px 0;}
+.kleg {display:flex; flex-wrap:wrap; gap:4px 10px; margin-top:7px; font-size:11.5px; color:#6A7389;}
+.kleg span {display:inline-flex; align-items:center; gap:5px; white-space:nowrap;}
+.kleg b {width:7px; height:7px; border-radius:50%; display:inline-block;}
+.ring {width:54px; height:54px; flex:none; position:relative; border-radius:50%; 
+  background:conic-gradient(var(--c) calc(var(--p) * 1%), #EEF1F5 0);
+  -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+          mask:radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+  animation:kRing 1.4s cubic-bezier(.2,.8,.2,1) .3s both;}
+.ring-wrap {position:relative; width:54px; height:54px; flex:none;}
+.ring-wrap span {position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:'Sora','Segoe UI',sans-serif; font-size:12px; font-weight:700; color:#0E1A3A;}
+.dots {display:flex; gap:6px; align-items:center;}
+.dots i {width:10px; height:10px; border-radius:50%; background:var(--c); animation:kBlink 2.4s ease-in-out infinite;}
+.dots i:nth-child(2){animation-delay:.3s}.dots i:nth-child(3){animation-delay:.6s}.dots i:nth-child(4){animation-delay:.9s}
+.dots i:nth-child(5){animation-delay:1.2s}.dots i:nth-child(n+6){animation-delay:1.5s}
+.alt {display:flex; align-items:center; justify-content:space-between; font-size:12px; color:#6A7389;
+  background:#F6F7FB; border-radius:9px; padding:7px 10px;}
+.alt b {color:#0E1A3A; font-weight:700; font-variant-numeric:tabular-nums;}
+@keyframes kIn {from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none}}
+@keyframes kGrow {from{transform:scaleX(0)} to{transform:scaleX(1)}}
+@keyframes kRing {from{transform:rotate(-120deg) scale(.6); opacity:0} to{transform:none; opacity:1}}
+@keyframes kShine {from{left:-60%; opacity:1} to{left:130%; opacity:1}}
+@keyframes kBlink {0%,100%{opacity:1} 50%{opacity:.35}}
+@media (prefers-reduced-motion: reduce){ .kc,.seg i,.ring,.dots i,.kc:hover::after {animation:none !important;} .kc:hover{transform:none;} }
+</style>
+"""
+
+KPI_ICONS = {
+    "send": '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/>',
+    "check": '<circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/>',
+    "trophy": '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
+    "clock": '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    "wallet": '<rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M16 12.5h2M2.5 10h19"/>',
+    "target": '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/>',
+}
+
+
+def kpi_icon(name: str, color: str = "#0E1A3A") -> str:
+    """Icon as an <img> data URI (Streamlit's HTML sanitiser drops inline <svg>)."""
+    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="{color}" '
+           f'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{KPI_ICONS[name]}</svg>')
+    return f'<img alt="" src="data:image/svg+xml;base64,{base64.b64encode(svg.encode()).decode()}">'
+
+
+def seg_bar(parts):
+    """parts: list of (value, color, label). Renders an animated segmented bar + legend."""
+    tot = sum(v for v, _, _ in parts) or 1
+    bars = "".join(f'<i style="width:{v / tot * 100:.2f}%;background:{c};animation-delay:{0.25 + i * 0.12:.2f}s" '
+                   f'title="{esc(l)}"></i>' for i, (v, c, l) in enumerate(parts) if v > 0)
+    return f'<div class="seg">{bars}</div>'
+
+
+def kpi_card(color, icon, label, value_html, sub, viz="", side=""):
+    return (f'<div class="kc" style="--c:{color}"><div class="kt"><span class="ki">{kpi_icon(icon, color)}</span>'
+            f'<span class="kl">{esc(label)}</span></div>'
+            f'<div class="kv-row"><div><div class="kv">{value_html}</div><div class="ks">{esc(sub)}</div></div>{side}</div>'
+            f'<div class="kz">{viz}</div></div>')
+
+
+upcoming_subs_n = df.loc[df.Status == "Upcoming", "Award"].nunique()
+pending_programs = df.loc[df.Status == "Pending", "Award"].nunique()
+declared_share = declared_subs / total_subs if total_subs else 0
+bu_spend = df.groupby("BU")["Cost (USD)"].sum().sort_values(ascending=False)
+bu_spend = bu_spend[bu_spend > 0]
+top_bu = bu_spend.index[0] if len(bu_spend) else None
+per_entry = spend / total_subs if total_subs else 0
+alt_cost = (f"₹{cost_per_win * settings['fx']:,.0f}" if not INR else f"${cost_per_win:,.2f}")
+
+cards = [
+    kpi_card("#0ea99b", "send", "Total submissions", cu(total_subs), f"{programs} programs entered",
+             seg_bar([(declared_subs, "#0ea99b", "Declared"), (pending_subs, "#f2a53c", "Pending")])
+             + f'<div class="kleg"><span><b style="background:#0ea99b"></b>{declared_subs} declared</span>'
+               f'<span><b style="background:#f2a53c"></b>{pending_subs} pending</span></div>'),
+    kpi_card("#3b8fd6", "check", "Results declared", cu(declared_subs), f"{declared['Award'].nunique()} programs",
+             seg_bar([(declared_subs, "#3b8fd6", "Declared"), (total_subs - declared_subs, "#E4E8EF", "Not yet")])
+             + f'<div class="kleg"><span>{declared_share:.0%} of all entries have results</span></div>'),
+    kpi_card(GOLD, "trophy", "Awards won", cu(won), f"{win_rate:.0%} win rate",
+             f'<div class="kleg"><span><b style="background:{GOLD}"></b>{won} won</span>'
+             f'<span><b style="background:#D5DBE5"></b>{max(declared_subs - won, 0)} not won</span></div>',
+             side=(f'<div class="ring-wrap"><div class="ring" style="--p:{win_rate * 100:.1f}"></div>'
+                   f'<span>{win_rate:.0%}</span></div>')),
+    kpi_card("#f2a53c", "clock", "Pending results", cu(pending_subs),
+             f"{pending_programs} program{'s' if pending_programs != 1 else ''} awaiting",
+             f'<div class="dots">{"".join("<i></i>" for _ in range(min(pending_programs, 8)))}</div>'
+             f'<div class="kleg"><span>{upcoming_subs_n} upcoming program{"s" if upcoming_subs_n != 1 else ""}</span></div>'),
+    kpi_card("#7c6ff0", "wallet", "Total spend", cu(spend * FX, 0, pre=SYM, loc=LOC),
+             f"top: {top_bu} {bu_spend.iloc[0] / spend:.0%}" if top_bu and spend else "all entries with cost",
+             seg_bar([(v, COLORS.get(b, "#8A92A6"), b) for b, v in bu_spend.items()])
+             + '<div class="kleg">' + "".join(f'<span><b style="background:{COLORS.get(b, "#8A92A6")}"></b>{esc(b)}</span>'
+                                             for b in bu_spend.index[:4]) + "</div>"),
+    kpi_card("#ef5da8", "target", "Cost per award won", cu(cost_per_win * FX, 2, pre=SYM, loc=LOC),
+             "declared spend ÷ wins",
+             f'<div class="alt"><span>Per entry</span><b>{money(per_entry, 0)}</b></div>'
+             f'<div class="alt" style="margin-top:6px"><span>In {"US$" if INR else "₹"}</span><b>{alt_cost}</b></div>'),
+]
+html_block(KPI_CSS + f'<div class="kx">{"".join(cards)}</div>', COUNT_UP_JS)
 
 if data_warnings:
     with st.expander(f"{len(data_warnings)} data note(s) to fix in the Google Sheet", icon=":material/info:"):
